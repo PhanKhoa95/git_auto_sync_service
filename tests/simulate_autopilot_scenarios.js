@@ -8,7 +8,10 @@ const repos = [];
 function runGit(repoPath, args) {
   const res = spawnSync('git', args, { cwd: repoPath, encoding: 'utf8' });
   if (res.status !== 0) {
-    throw new Error(`Command failed: git ${args.join(' ')}\nError: ${res.stderr}`);
+    if (args[0] === 'commit' && res.status === 1) {
+      return res.stdout;
+    }
+    throw new Error(`Command failed: git ${args.join(' ')}\nError: ${res.stderr}\nStdout: ${res.stdout}`);
   }
   return res.stdout;
 }
@@ -24,50 +27,27 @@ async function run() {
   function createRepo(name) {
     const repoPath = path.join(BASE_DIR, name);
     if (fs.existsSync(repoPath)) {
-      log(`Repo folder exists: ${name}. Cleaning contents instead of deleting to avoid Windows lock issues...`);
       try {
-        // Unset read-only attribute if any
-        execSync(`attrib -r "${repoPath}\\*.*" /s /d`, { stdio: 'ignore' });
-      } catch(e){}
-      
-      // Clean git repo
-      try {
-        runGit(repoPath, ['clean', '-fdx']);
-        runGit(repoPath, ['reset', '--hard']);
-      } catch (e) {
-        log(`Git clean failed for ${name}, trying manual file removal...`);
-        try {
-          const items = fs.readdirSync(repoPath);
-          for (const item of items) {
-            if (item === '.git') continue;
-            fs.rmSync(path.join(repoPath, item), { recursive: true, force: true });
-          }
-        } catch (err) {
-          log(`Manual clean failed: ${err.message}`);
-        }
+        fs.rmSync(repoPath, { recursive: true, force: true });
+      } catch(e) {
+        log(`Failed to delete ${name}: ${e.message}`);
       }
-    } else {
+    }
+    if (!fs.existsSync(repoPath)) {
       fs.mkdirSync(repoPath, { recursive: true });
-      runGit(repoPath, ['init']);
-      runGit(repoPath, ['checkout', '-b', 'main']);
     }
-    
-    // Ensure HEAD is pointing to main and clean state
+    try { runGit(repoPath, ['init']); } catch(e){}
     try {
-      runGit(repoPath, ['checkout', 'main']);
-    } catch(e) {
-      try { runGit(repoPath, ['checkout', '-b', 'main']); } catch(err){}
-    }
-
+      runGit(repoPath, ['config', 'user.name', 'E2ETester']);
+      runGit(repoPath, ['config', 'user.email', 'tester@e2e.local']);
+    } catch(e){}
     fs.writeFileSync(path.join(repoPath, 'README.md'), `# ${name}\n`);
     runGit(repoPath, ['add', '.']);
-    try {
-      runGit(repoPath, ['commit', '-m', 'Initial commit']);
-    } catch(e) {}
+    runGit(repoPath, ['commit', '-m', 'Initial commit']);
+    try { runGit(repoPath, ['branch', '-M', 'main']); } catch(e){}
     repos.push(repoPath);
     return repoPath;
   }
-
   function setupRemote(localPath, name) {
     const remotePath = path.join(BASE_DIR, 'temp_remotes', name + '.git');
     if (fs.existsSync(remotePath)) {
@@ -80,6 +60,7 @@ async function run() {
     if (!fs.existsSync(remotePath)) {
       fs.mkdirSync(remotePath, { recursive: true });
       execSync(`git init --bare`, { cwd: remotePath });
+      try { execSync(`git symbolic-ref HEAD refs/heads/main`, { cwd: remotePath }); } catch(e){}
     }
     
     // Check if remote 'origin' already exists
@@ -145,6 +126,9 @@ async function run() {
     const r4Clone = path.join(BASE_DIR, 'temp_remotes', 'sync_fail_4_merge_conflict_clone');
     if (fs.existsSync(r4Clone)) fs.rmSync(r4Clone, { recursive: true, force: true });
     execSync(`git clone "${rem4}" "${r4Clone}"`);
+    try { runGit(r4Clone, ['checkout', 'main']); } catch(e){
+      try { runGit(r4Clone, ['checkout', '-b', 'main']); } catch(err){}
+    }
     runGit(r4Clone, ['config', 'user.name', 'Tester']);
     runGit(r4Clone, ['config', 'user.email', 'tester@e2e.local']);
     fs.writeFileSync(path.join(r4Clone, 'conflict.txt'), 'Remote Content\n');
@@ -162,6 +146,9 @@ async function run() {
     const r5Clone = path.join(BASE_DIR, 'temp_remotes', 'sync_fail_5_non_ff_clone');
     if (fs.existsSync(r5Clone)) fs.rmSync(r5Clone, { recursive: true, force: true });
     execSync(`git clone "${rem5}" "${r5Clone}"`);
+    try { runGit(r5Clone, ['checkout', 'main']); } catch(e){
+      try { runGit(r5Clone, ['checkout', '-b', 'main']); } catch(err){}
+    }
     runGit(r5Clone, ['config', 'user.name', 'Tester']);
     runGit(r5Clone, ['config', 'user.email', 'tester@e2e.local']);
     fs.writeFileSync(path.join(r5Clone, 'ff.txt'), 'Remote Content 2\n');
