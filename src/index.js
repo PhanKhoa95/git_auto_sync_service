@@ -110,11 +110,10 @@ process.on('uncaughtException', (error) => {
 // Lightweight HTTP Server for Web Dashboard
 // ==================================================
 const http = require('http');
-const url = require('url');
 
 function startServer(port) {
   const server = http.createServer((req, res) => {
-    const reqUrl = url.parse(req.url, true);
+    const reqPath = req.url.split('?')[0];
     
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -127,7 +126,7 @@ function startServer(port) {
       return;
     }
 
-    if (req.method === 'GET' && reqUrl.pathname === '/') {
+    if (req.method === 'GET' && reqPath === '/') {
       const dashboardPath = path.join(__dirname, 'dashboard.html');
       if (fs.existsSync(dashboardPath)) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -136,7 +135,7 @@ function startServer(port) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Dashboard HTML file not found.');
       }
-    } else if (req.method === 'GET' && reqUrl.pathname === '/api/status') {
+    } else if (req.method === 'GET' && reqPath === '/api/status') {
       const { getWatchedRepositoriesMetadata } = require('./repo-watcher');
       const metadata = getWatchedRepositoriesMetadata();
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -146,7 +145,7 @@ function startServer(port) {
         watchedRepositories: metadata.watchedRepositories,
         lastScanTime: metadata.lastScanTime
       }));
-    } else if (req.method === 'GET' && reqUrl.pathname === '/api/logs') {
+    } else if (req.method === 'GET' && reqPath === '/api/logs') {
       const logPath = logger.getLogFilePath();
       if (fs.existsSync(logPath)) {
         try {
@@ -163,7 +162,7 @@ function startServer(port) {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('');
       }
-    } else if (req.method === 'POST' && reqUrl.pathname === '/api/sync') {
+    } else if (req.method === 'POST' && reqPath === '/api/sync') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
       req.on('end', () => {
@@ -181,17 +180,18 @@ function startServer(port) {
           res.end(JSON.stringify({ success: false, message: e.message }));
         }
       });
-    } else if (req.method === 'POST' && reqUrl.pathname === '/api/scan') {
+    } else if (req.method === 'POST' && reqPath === '/api/scan') {
       const { forceGlobalScan } = require('./repo-watcher');
       forceGlobalScan(BASE_DIR);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
-    } else if (req.method === 'POST' && reqUrl.pathname === '/api/logs/clear') {
+    } else if (req.method === 'POST' && reqPath === '/api/logs/clear') {
       const logPath = logger.getLogFilePath();
       fs.writeFileSync(logPath, '', 'utf8');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
-    } else if (req.method === 'POST' && reqUrl.pathname === '/api/stop') {
+    } else if (req.method === 'POST' && reqPath === '/api/stop') {
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
       logger.info('Shutting down daemon via Web Dashboard stop command...');
