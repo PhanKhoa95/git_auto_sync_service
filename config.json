@@ -1,5 +1,13 @@
 {
   "debounceDelayMs": 10000,
-  "monitoredRoots": ["E:\\"],
-  "ignoredPatterns": [".git", ".agents", "sync.log", "node_modules"]
+  "monitoredRoots": [
+    "E:\\",
+    "E:\\Thư mục mới"
+  ],
+  "ignoredPatterns": [
+    ".git",
+    ".agents",
+    "sync.log",
+    "node_modules"
+  ]
 }

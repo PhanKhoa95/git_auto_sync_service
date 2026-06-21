@@ -179,6 +179,65 @@ function startServer(port) {
           res.end(JSON.stringify({ success: false, message: e.message }));
         }
       });
+    } else if (req.method === 'POST' && reqPath === '/api/clone') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.cloneUrl || !parsed.rootPath || !parsed.folderName) {
+            throw new Error('Missing cloneUrl, rootPath, or folderName.');
+          }
+
+          const destPath = path.join(parsed.rootPath, parsed.folderName);
+          if (fs.existsSync(destPath)) {
+            throw new Error('Destination folder already exists.');
+          }
+
+          res.writeHead(200, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Transfer-Encoding': 'chunked',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
+
+          res.write(`[INFO] Starting git clone for ${parsed.cloneUrl} into ${destPath}...\n`);
+
+          const { spawn } = require('child_process');
+          const child = spawn('git', ['clone', '--progress', parsed.cloneUrl, destPath]);
+
+          child.stdout.on('data', data => {
+            res.write(data);
+          });
+
+          child.stderr.on('data', data => {
+            res.write(data);
+          });
+
+          child.on('error', err => {
+            res.write(`\n[ERROR] Process error: ${err.message}\n`);
+            res.end();
+          });
+
+          child.on('close', code => {
+            if (code === 0) {
+              res.write(`\n[SUCCESS] Repository cloned successfully.\n`);
+              try {
+                const { forceGlobalScan } = require('./repo-watcher');
+                forceGlobalScan();
+              } catch (e) {
+                res.write(`[WARN] Failed to trigger repository scan: ${e.message}\n`);
+              }
+            } else {
+              res.write(`\n[ERROR] git clone exited with code ${code}.\n`);
+            }
+            res.end();
+          });
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
     } else if (req.method === 'GET' && reqPath === '/api/status') {
       const { getWatchedRepositoriesMetadata } = require('./repo-watcher');
       const metadata = getWatchedRepositoriesMetadata();
