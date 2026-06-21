@@ -105,3 +105,123 @@ process.on('uncaughtException', (error) => {
   // Log and exit with error code, allowing launcher/daemon tools to restart if configured
   process.exit(1);
 });
+
+// ==================================================
+// Lightweight HTTP Server for Web Dashboard
+// ==================================================
+const http = require('http');
+const url = require('url');
+
+function startServer(port) {
+  const server = http.createServer((req, res) => {
+    const reqUrl = url.parse(req.url, true);
+    
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl.pathname === '/') {
+      const dashboardPath = path.join(__dirname, 'dashboard.html');
+      if (fs.existsSync(dashboardPath)) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(fs.readFileSync(dashboardPath));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Dashboard HTML file not found.');
+      }
+    } else if (req.method === 'GET' && reqUrl.pathname === '/api/status') {
+      const { getWatchedRepositoriesMetadata } = require('./repo-watcher');
+      const metadata = getWatchedRepositoriesMetadata();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        pid: process.pid,
+        baseDir: BASE_DIR,
+        watchedRepositories: metadata.watchedRepositories,
+        lastScanTime: metadata.lastScanTime
+      }));
+    } else if (req.method === 'GET' && reqUrl.pathname === '/api/logs') {
+      const logPath = logger.getLogFilePath();
+      if (fs.existsSync(logPath)) {
+        try {
+          const data = fs.readFileSync(logPath, 'utf8');
+          const lines = data.split('\n');
+          const lastLines = lines.slice(-200).join('\n');
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(lastLines);
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end(`Error reading logs: ${e.message}`);
+        }
+      } else {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('');
+      }
+    } else if (req.method === 'POST' && reqUrl.pathname === '/api/sync') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.repoPath) {
+            throw new Error('Missing repoPath parameter.');
+          }
+          const { syncRepository } = require('./git-sync');
+          syncRepository(parsed.repoPath);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
+    } else if (req.method === 'POST' && reqUrl.pathname === '/api/scan') {
+      const { forceGlobalScan } = require('./repo-watcher');
+      forceGlobalScan(BASE_DIR);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } else if (req.method === 'POST' && reqUrl.pathname === '/api/logs/clear') {
+      const logPath = logger.getLogFilePath();
+      fs.writeFileSync(logPath, '', 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } else if (req.method === 'POST' && reqUrl.pathname === '/api/stop') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      logger.info('Shutting down daemon via Web Dashboard stop command...');
+      stopWatching();
+      setTimeout(() => {
+        process.exit(0);
+      }, 500);
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not found.');
+    }
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.warn(`Port ${port} is already in use. Retrying on port ${port + 1}...`);
+      startServer(port + 1);
+    } else {
+      logger.error(`Dashboard server error: ${err.message}`);
+    }
+  });
+
+  server.listen(port, '127.0.0.1', () => {
+    logger.info(`Dashboard server running at: http://localhost:${port}`);
+  });
+}
+
+// Start Dashboard HTTP Server if not running in test mode
+if (process.env.NODE_ENV !== 'test' && !process.env.TEST_E_DRIVE_PATH) {
+  const defaultPort = parseInt(process.env.PORT, 10) || 3000;
+  startServer(defaultPort);
+}
+

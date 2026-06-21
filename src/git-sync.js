@@ -35,6 +35,24 @@ function hasOriginRemote(repoPath) {
 }
 
 /**
+ * Parses .git/config to retrieve remote origin URL without spawning processes.
+ */
+function getRemoteOriginUrl(repoPath) {
+  try {
+    const configPath = path.join(repoPath, '.git', 'config');
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf8');
+      const match = content.match(/\[remote\s+"origin"\][^]*?url\s*=\s*(.*?)(?:\r?\n)/i);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+
+/**
  * Automatically detects symbolic links and directory junctions in the repo
  * and adds them to .git/info/exclude to prevent Git from infinitely recursing.
  */
@@ -280,5 +298,7 @@ async function performSync(repoPath) {
 
 module.exports = {
   syncRepository,
-  runGit
+  runGit,
+  getRemoteOriginUrl
 };
+

@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git Auto-Sync Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0b0c10;
+      --card-bg: rgba(26, 28, 44, 0.45);
+      --card-border: rgba(255, 255, 255, 0.06);
+      --accent-color: #00f2fe;
+      --accent-glow: rgba(0, 242, 254, 0.15);
+      --success-color: #00e676;
+      --success-glow: rgba(0, 230, 118, 0.2);
+      --warning-color: #ffd600;
+      --error-color: #ff1744;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --glass-blur: blur(12px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(at 10% 20%, rgba(0, 242, 254, 0.03) 0px, transparent 50%),
+        radial-gradient(at 90% 80%, rgba(0, 230, 118, 0.02) 0px, transparent 50%);
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Header Styling */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 2rem;
+      background: var(--card-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent-color), var(--success-color));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .logo-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: #0b0c10;
+    }
+
+    .logo-text h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(to right, #ffffff, #d1d5db);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo-text p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 1rem;
+      border-radius: 30px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+      position: relative;
+    }
+
+    .status-dot.active {
+      background-color: var(--success-color);
+      box-shadow: 0 0 10px var(--success-color);
+    }
+    .status-dot.active::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: var(--success-color);
+      animation: pulse 1.8s infinite;
+      left: 0;
+      top: 0;
+    }
+
+    .status-dot.inactive {
+      background-color: var(--error-color);
+      box-shadow: 0 0 10px var(--error-color);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+
+    /* Grid layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 550px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Stat Cards */
+    .stat-card {
+      background: var(--card-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .stat-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Main Panels */
+    .panel {
+      background: var(--card-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.8rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 0.8rem;
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .panel-title svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--accent-color);
+    }
+
+    /* Button styles */
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary {
+      background: var(--accent-color);
+      color: #0b0c10;
+      border: none;
+      font-weight: 600;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: #00dcf5;
+      box-shadow: 0 0 15px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      background: rgba(255, 23, 68, 0.15);
+      color: var(--error-color);
+      border-color: rgba(255, 23, 68, 0.25);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 23, 68, 0.25);
+      border-color: var(--error-color);
+    }
+
+    .btn-danger:active {
+      transform: scale(0.98);
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+      border-radius: 6px;
+    }
+
+    /* Repositories Table */
+    .repo-table-container {
+      overflow-x: auto;
+    }
+
+    .repo-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .repo-table th {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      letter-spacing: 0.5px;
+    }
+
+    .repo-table td {
+      padding: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      font-size: 0.85rem;
+      vertical-align: middle;
+    }
+
+    .repo-table tr:hover td {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .repo-name {
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .repo-name svg {
+      width: 16px;
+      height: 16px;
+      fill: var(--accent-color);
+    }
+
+    .repo-path {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .repo-url {
+      color: var(--accent-color);
+      text-decoration: none;
+      transition: text-shadow 0.2s ease;
+    }
+
+    .repo-url:hover {
+      text-decoration: underline;
+      text-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    /* Terminal Console */
+    .terminal {
+      background: #050508;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 1.2rem;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      height: 350px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .log-line {
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-time {
+      color: #7c3aed;
+      margin-right: 0.5rem;
+    }
+
+    .log-level-info {
+      color: var(--success-color);
+      font-weight: 500;
+    }
+
+    .log-level-warn {
+      color: var(--warning-color);
+      font-weight: 500;
+    }
+
+    .log-level-error {
+      color: var(--error-color);
+      font-weight: bold;
+    }
+
+    .log-level-debug {
+      color: var(--text-muted);
+    }
+
+    .log-text {
+      color: var(--text-main);
+    }
+
+    .terminal-controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .checkbox-label input {
+      accent-color: var(--accent-color);
+      cursor: pointer;
+    }
+
+    /* Empty state */
+    .empty-state {
+      padding: 3rem;
+      text-align: center;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      fill: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Overlay when disconnected */
+    .disconnect-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(11, 12, 16, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1.5rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .disconnect-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .disconnect-card {
+      background: rgba(30, 32, 48, 0.8);
+      border: 1px solid rgba(255, 23, 68, 0.2);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      border-radius: 20px;
+      padding: 2.5rem;
+      width: 420px;
+      max-width: 90%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    .disconnect-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(255, 23, 68, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--error-color);
+      margin-bottom: 0.5rem;
+      animation: pulse-border 2s infinite;
+    }
+
+    @keyframes pulse-border {
+      0% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0.4); }
+      70% { box-shadow: 0 0 0 15px rgba(255, 23, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0); }
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.02);
+      margin-top: auto;
+    }
+
+    footer a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <div class="logo-icon">
+          <!-- Folder sync SVG icon -->
+          <svg viewBox="0 0 24 24">
+            <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 10v-3H8v-2h4V8l4 4-4 4z"/>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>Antigravity Sync</h1>
+          <p>Git Auto-Sync Service Controller</p>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <div class="status-badge">
+          <div class="status-dot active" id="headerStatusDot"></div>
+          <span id="headerStatusText">Service Active</span>
+        </div>
+        <button class="btn btn-danger btn-sm" id="btnStopService">Stop Daemon</button>
+      </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <div class="dashboard-grid">
+      <div class="stat-card">
+        <div class="stat-label">Daemon Status</div>
+        <div class="stat-value" id="statStatus" style="color: var(--success-color);">Active</div>
+        <div class="stat-desc" id="statPid">PID: Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Monitored Base</div>
+        <div class="stat-value" id="statBaseDir" style="font-family: 'Fira Code', monospace; font-size: 1.1rem; padding: 0.2rem 0;">E:\</div>
+        <div class="stat-desc">Root & Level-1 child directories</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Watched Repositories</div>
+        <div class="stat-value" id="statRepoCount">0</div>
+        <div class="stat-desc">Active Git repositories monitored</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Heartbeat / Scan</div>
+        <div class="stat-value" style="font-size: 1.2rem; padding: 0.15rem 0;" id="statLastScan">Just now</div>
+        <div class="stat-desc">Scans automatically every 30s</div>
+      </div>
+    </div>
+
+    <!-- Active Repositories -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0-2-.9-2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+          Monitored Git Repositories
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnScanNow">
+          <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          Scan For Repos
+        </button>
+      </div>
+
+      <div class="repo-table-container">
+        <table class="repo-table" id="repoTable">
+          <thead>
+            <tr>
+              <th width="35%">Repository</th>
+              <th width="45%">Remote origin</th>
+              <th width="20%" style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="repoTableBody">
+            <tr>
+              <td colspan="3">
+                <div class="empty-state">
+                  <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm-9 9H7v-2h3v2zm7 0h-5v-2h5v2zm2-7H5V10h14v2z"/></svg>
+                  <p>Scanning for repositories on drive E:\...</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Live Logs -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+          Real-Time Sync Logs
+        </div>
+        <div class="terminal-controls">
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkAutoscroll" checked> Autoscroll
+          </label>
+          <span style="color: rgba(255,255,255,0.15)">|</span>
+          <button class="btn btn-sm" id="btnClearLogs">Clear Log File</button>
+        </div>
+      </div>
+
+      <div class="terminal" id="terminalConsole">
+        <div class="log-line"><span class="log-level-debug">Terminal initialized. Loading logs...</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disconnected Overlay -->
+  <div class="disconnect-overlay" id="disconnectOverlay">
+    <div class="disconnect-card">
+      <div class="disconnect-icon">
+        <svg style="width: 28px; height: 28px; fill: currentColor;" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        </svg>
+      </div>
+      <h2 style="font-weight: 700; font-size: 1.3rem;">Daemon Disconnected</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.4;">
+        The background Git Auto-Sync service is not running or the server is offline. Run <strong>setup.bat</strong> or launch the service again.
+      </p>
+      <button class="btn btn-primary" id="btnRetryConnect" style="width: 100%; justify-content: center; padding: 0.7rem 0;">
+        Retry Connection
+      </button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 Antigravity Auto-Sync Service. Active in background.</p>
+  </footer>
+
+  <script>
+    // Configuration
+    const API_STATUS_URL = '/api/status';
+    const API_LOGS_URL = '/api/logs';
+    const API_SYNC_URL = '/api/sync';
+    const API_STOP_URL = '/api/stop';
+    
+    let isConnected = true;
+    let pollInterval = null;
+    let lastLogHash = '';
+
+    // Element bindings
+    const headerStatusDot = document.getElementById('headerStatusDot');
+    const headerStatusText = document.getElementById('headerStatusText');
+    const btnStopService = document.getElementById('btnStopService');
+    
+    const statStatus = document.getElementById('statStatus');
+    const statPid = document.getElementById('statPid');
+    const statBaseDir = document.getElementById('statBaseDir');
+    const statRepoCount = document.getElementById('statRepoCount');
+    const statLastScan = document.getElementById('statLastScan');
+    
+    const repoTableBody = document.getElementById('repoTableBody');
+    const btnScanNow = document.getElementById('btnScanNow');
+    
+    const terminalConsole = document.getElementById('terminalConsole');
+    const chkAutoscroll = document.getElementById('chkAutoscroll');
+    const btnClearLogs = document.getElementById('btnClearLogs');
+    
+    const disconnectOverlay = document.getElementById('disconnectOverlay');
+    const btnRetryConnect = document.getElementById('btnRetryConnect');
+
+    // Initialize Page
+    function init() {
+      fetchData();
+      // Poll every 2 seconds
+      pollInterval = setInterval(fetchData, 2000);
+
+      // Event listeners
+      btnScanNow.addEventListener('click', forceGlobalScan);
+      btnStopService.addEventListener('click', stopDaemon);
+      btnClearLogs.addEventListener('click', clearLogFile);
+      btnRetryConnect.addEventListener('click', () => {
+        fetchData();
+      });
+    }
+
+    // Set connection status
+    function setConnectionState(connected) {
+      isConnected = connected;
+      if (connected) {
+        disconnectOverlay.classList.remove('show');
+        headerStatusDot.className = 'status-dot active';
+        headerStatusText.textContent = 'Service Active';
+        statStatus.textContent = 'Active';
+        statStatus.style.color = 'var(--success-color)';
+      } else {
+        disconnectOverlay.classList.add('show');
+        headerStatusDot.className = 'status-dot inactive';
+        headerStatusText.textContent = 'Disconnected';
+        statStatus.textContent = 'Inactive';
+        statStatus.style.color = 'var(--error-color)';
+        statPid.textContent = 'PID: None';
+        statRepoCount.textContent = '0';
+      }
+    }
+
+    // Fetch API Data
+    async function fetchData() {
+      try {
+        const response = await fetch(API_STATUS_URL);
+        if (!response.ok) throw new Error('API server returned error status');
+        const data = await response.json();
+        
+        setConnectionState(true);
+        updateStatusStats(data);
+        updateRepoTable(data.watchedRepositories);
+        fetchLogs();
+      } catch (err) {
+        setConnectionState(false);
+      }
+    }
+
+    // Update stats cards
+    function updateStatusStats(data) {
+      statPid.textContent = `PID: ${data.pid}`;
+      statBaseDir.textContent = data.baseDir;
+      statRepoCount.textContent = Object.keys(data.watchedRepositories).length;
+      
+      const lastScanDate = new Date(data.lastScanTime);
+      statLastScan.textContent = lastScanDate.toLocaleTimeString();
+    }
+
+    // Render repository list
+    function updateRepoTable(repos) {
+      const repoPaths = Object.keys(repos);
+      if (repoPaths.length === 0) {
+        repoTableBody.innerHTML = `
+          <tr>
+            <td colspan="3">
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm-9 9H7v-2h3v2zm7 0h-5v-2h5v2zm2-7H5V10h14v2z"/></svg>
+                <p>No active Git repositories detected on E:\\</p>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Make sure your folders contain a .git directory.</span>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      let html = '';
+      repoPaths.forEach(repoPath => {
+        const repo = repos[repoPath];
+        const folderName = repoPath.split('\\').pop() || repoPath.split('/').pop() || repoPath;
+        const remoteUrl = repo.remoteOrigin || 'No remote origin configured';
+        const isClickableUrl = remoteUrl.startsWith('http') || remoteUrl.startsWith('git@');
+        const formattedUrl = isClickableUrl 
+          ? `<a href="${remoteUrl.replace(/\.git$/, '')}" target="_blank" class="repo-url">${remoteUrl}</a>`
+          : `<span style="color: var(--text-muted); font-style: italic;">${remoteUrl}</span>`;
+
+        html += `
+          <tr>
+            <td>
+              <div class="repo-name">
+                <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                ${folderName}
+              </div>
+              <div class="repo-path">${repoPath}</div>
+            </td>
+            <td>${formattedUrl}</td>
+            <td style="text-align: right;">
+              <button class="btn btn-sm btn-primary" onclick="forceRepoSync('${repoPath.replace(/\\/g, '\\\\')}')">Sync Now</button>
+            </td>
+          </tr>
+        `;
+      });
+      repoTableBody.innerHTML = html;
+    }
+
+    // Fetch and parse logs
+    async function fetchLogs() {
+      try {
+        const response = await fetch(API_LOGS_URL);
+        if (!response.ok) return;
+        const rawLogs = await response.text();
+        
+        // Simple hash check to avoid re-rendering log when unchanged
+        if (rawLogs === lastLogHash) return;
+        lastLogHash = rawLogs;
+
+        const lines = rawLogs.split('\n').filter(l => l.trim() !== '');
+        
+        if (lines.length === 0) {
+          terminalConsole.innerHTML = '<div class="log-line"><span class="log-level-debug">Logs are empty. Watching for sync events...</span></div>';
+          return;
+        }
+
+        let terminalHtml = '';
+        lines.forEach(line => {
+          // Parse timestamp: [YYYY-MM-DD HH:MM:SS]
+          const timeMatch = line.match(/^\[(.*?)\]/);
+          const timeStr = timeMatch ? timeMatch[1] : '';
+          
+          let cleanLine = timeMatch ? line.substring(timeMatch[0].length).trim() : line;
+          
+          // Parse log level: [LEVEL]
+          const levelMatch = cleanLine.match(/^\[(.*?)\]/);
+          const levelStr = levelMatch ? levelMatch[1] : '';
+          cleanLine = levelMatch ? cleanLine.substring(levelMatch[0].length).trim() : cleanLine;
+
+          let levelClass = 'log-level-debug';
+          if (levelStr === 'INFO') levelClass = 'log-level-info';
+          else if (levelStr === 'WARN') levelClass = 'log-level-warn';
+          else if (levelStr === 'ERROR') levelClass = 'log-level-error';
+
+          terminalHtml += `
+            <div class="log-line">
+              <span class="log-time">[${timeStr}]</span>
+              <span class="${levelClass}">[${levelStr}]</span>
+              <span class="log-text">${escapeHtml(cleanLine)}</span>
+            </div>
+          `;
+        });
+
+        terminalConsole.innerHTML = terminalHtml;
+
+        if (chkAutoscroll.checked) {
+          terminalConsole.scrollTop = terminalConsole.scrollHeight;
+        }
+      } catch (err) {
+        console.error('Failed to load logs:', err);
+      }
+    }
+
+    // Escape HTML to prevent injection
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Actions
+    async function forceRepoSync(repoPath) {
+      try {
+        const response = await fetch(API_SYNC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoPath })
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert(`Sync triggered successfully for repository: ${repoPath}`);
+          fetchData();
+        } else {
+          alert(`Failed to trigger sync: ${result.message}`);
+        }
+      } catch (err) {
+        alert(`Error triggering sync: ${err.message}`);
+      }
+    }
+
+    async function forceGlobalScan() {
+      // API call to force scan
+      try {
+        const response = await fetch('/api/scan', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+          alert('Global repository scan triggered successfully.');
+          fetchData();
+        }
+      } catch (err) {
+        alert(`Failed to trigger scan: ${err.message}`);
+      }
+    }
+
+    async function stopDaemon() {
+      if (!confirm('Are you sure you want to stop the background Git Auto-Sync service?\nThe server will go offline and monitoring will stop.')) {
+        return;
+      }
+      try {
+        const response = await fetch(API_STOP_URL, { method: 'POST' });
+        if (response.ok) {
+          setConnectionState(false);
+          clearInterval(pollInterval);
+        }
+      } catch (err) {
+        console.error('Stop command failed:', err);
+      }
+    }
+
+    async function clearLogFile() {
+      if (!confirm('Are you sure you want to clear all historical log entries in sync.log?')) {
+        return;
+      }
+      try {
+        const response = await fetch('/api/logs/clear', { method: 'POST' });
+        if (response.ok) {
+          terminalConsole.innerHTML = '<div class="log-line"><span class="log-level-debug">Logs cleared.</span></div>';
+        }
+      } catch (err) {
+        console.error('Failed to clear logs:', err);
+      }
+    }
+
+    // Run startup
+    init();
+  </script>
+</body>
+</html>

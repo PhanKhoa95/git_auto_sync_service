@@ -6,6 +6,8 @@ const { syncRepository } = require('./git-sync');
 const watchers = new Map();      // repoPath -> FSWatcher instance
 const debounceTimers = new Map(); // repoPath -> setTimeout ID
 let scanInterval = null;
+let lastScanTime = Date.now();
+
 
 /**
  * Normalizes and checks if a file change event should be ignored.
@@ -238,6 +240,7 @@ function stopWatchingRepo(repoPath) {
  */
 function watchRepositories(baseDir) {
   logger.info(`Initializing repo watcher on: ${baseDir}`);
+  lastScanTime = Date.now();
   
   // Perform initial scan and start watchers
   updateWatchers(baseDir);
@@ -245,11 +248,13 @@ function watchRepositories(baseDir) {
   // Start 30-second periodic scan interval
   scanInterval = setInterval(() => {
     logger.info(`Running periodic 30-second repository scan under ${baseDir}...`);
+    lastScanTime = Date.now();
     updateWatchers(baseDir);
   }, 30000);
 
   return watchers;
 }
+
 
 /**
  * Stops all active file watchers and intervals.
@@ -272,9 +277,32 @@ function stopWatching() {
   watchers.clear();
 }
 
+function getWatchedRepositoriesMetadata() {
+  const metadata = {};
+  const { getRemoteOriginUrl } = require('./git-sync');
+  for (const repoPath of watchers.keys()) {
+    metadata[repoPath] = {
+      remoteOrigin: getRemoteOriginUrl(repoPath)
+    };
+  }
+  return {
+    watchedRepositories: metadata,
+    lastScanTime
+  };
+}
+
+function forceGlobalScan(baseDir) {
+  logger.info(`Forcing repository scan under ${baseDir}...`);
+  lastScanTime = Date.now();
+  updateWatchers(baseDir);
+}
+
 module.exports = {
   watchRepositories,
   stopWatching,
   isIgnored,
-  findGitRepositories
+  findGitRepositories,
+  getWatchedRepositoriesMetadata,
+  forceGlobalScan
 };
+
