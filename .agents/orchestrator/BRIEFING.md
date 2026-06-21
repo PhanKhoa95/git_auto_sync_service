@@ -1,21 +1,21 @@
-# BRIEFING — 2026-06-21T01:01:00+07:00
+# BRIEFING — 2026-06-21T21:54:00+07:00
 
 ## Mission
-Plan, coordinate, and execute the Git Auto-Sync Service project using specialist subagents.
+Plan, coordinate, and execute the Git Auto-Sync Service hardening task.
 
 ## 🔒 My Identity
 - Archetype: teamwork_preview_orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
 - Working directory: E:\git_auto_sync_service\.agents\orchestrator
 - Original parent: main agent
-- Original parent conversation ID: 898e278f-6522-4c90-b8aa-f081557f3e2f
+- Original parent conversation ID: 8a37c830-14d3-4d1b-b9bc-beecc1fa4abc
 
 ## 🔒 My Workflow
 - **Pattern**: Project
-- **Scope document**: E:\git_auto_sync_service\PROJECT.md
-1. **Decompose**: Decompose the project into milestones and dual tracks (Implementation and E2E Testing).
-2. **Dispatch & Execute** (pick ONE):
-   - **Delegate (sub-orchestrator)**: Spawn a sub-orchestrator for each milestone and track.
+- **Scope document**: E:\git_auto_sync_service\.agents\orchestrator\plan.md
+1. **Decompose**: Decompose the hardening task into 4 milestones (HL_EXPLORE, HL_DAEMON, HL_DASHBOARD, HL_VERIFY).
+2. **Dispatch & Execute**:
+   - **Direct (iteration loop)**: Iterate: Explorer -> Worker -> Reviewer -> Challenger -> Auditor.
 3. **On failure** (in this order):
    - Retry: nudge stuck agent or re-send task
    - Replace: spawn fresh agent with partial progress
@@ -25,12 +25,12 @@ Plan, coordinate, and execute the Git Auto-Sync Service project using specialist
    - Escalate: report to parent (sub-orchestrators only, last resort)
 4. **Succession**: Self-succeed at 16 spawns. Write handoff.md, spawn successor, cancel timers.
 - **Work items**:
-  1. Decompose project into milestones [done]
-  2. Spawn E2E Testing track [in-progress]
-  3. Spawn Implementation track [in-progress]
-  4. Perform final verification [pending]
-- **Current phase**: 2
-- **Current focus**: Monitor sub-orchestrators for E2E Testing and Implementation tracks
+  1. Explore codebase for leaks and races [pending]
+  2. Implement daemon stability and memory fixes [pending]
+  3. Clean and optimize dashboard [pending]
+  4. Verify all tests and run forensic audit [pending]
+- **Current phase**: 1
+- **Current focus**: HL_EXPLORE
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -41,30 +41,30 @@ Plan, coordinate, and execute the Git Auto-Sync Service project using specialist
 - Heartbeat cron: check subagents and update progress.md every 10 min.
 
 ## Current Parent
-- Conversation ID: 898e278f-6522-4c90-b8aa-f081557f3e2f
-- Updated: not yet
+- Conversation ID: 8a37c830-14d3-4d1b-b9bc-beecc1fa4abc
+- Updated: 2026-06-21T14:54:00Z
 
 ## Key Decisions Made
-- Use Project Pattern to run E2E Testing Track and Implementation Track in parallel.
+- Decomposed the hardening task into 4 milestones: HL_EXPLORE, HL_DAEMON, HL_DASHBOARD, HL_VERIFY.
+- Initiated Milestone 1 (HL_EXPLORE).
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
-| env_explorer | teamwork_preview_explorer | Environment check | completed | 9d5632d1-b22d-4585-843c-39903fb61854 |
-| e2e_testing_orch | self | E2E Testing Track Sub-orchestrator | in-progress | bc8e660d-be45-4288-bc48-582e745c89a5 |
-| implementation_orch | self | Implementation Track Sub-orchestrator | in-progress | 9d71f29b-fbe8-4e6a-ab54-530f5c2101b5 |
+| explorer_hardening | teamwork_preview_explorer | Explore codebase for leaks and bugs | in-progress | a326e183-c8d1-40df-8c31-f0c19168ba2f |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 3 / 16
-- Pending subagents: bc8e660d-be45-4288-bc48-582e745c89a5, 9d71f29b-fbe8-4e6a-ab54-530f5c2101b5
+- Spawn count: 1 / 16
+- Pending subagents: a326e183-c8d1-40df-8c31-f0c19168ba2f
 - Predecessor: 6c663324-d0d1-459e-855b-2752b4ad7a52
 - Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: 1fb858f8-0046-4bc8-b99b-75867021369e/task-35
+- Heartbeat cron: 65303775-0de2-4503-b0aa-9260924c08e2/task-97
 - Safety timer: none
 
 ## Artifact Index
-- E:\git_auto_sync_service\.agents\orchestrator\ORIGINAL_REQUEST.md — Original request verbatim copy
-- E:\git_auto_sync_service\PROJECT.md — Global project plan and milestones
+- E:\git_auto_sync_service\.agents\orchestrator\ORIGINAL_REQUEST.md — Original request copy
+- E:\git_auto_sync_service\.agents\orchestrator\plan.md — Hardening plan
+- E:\git_auto_sync_service\.agents\orchestrator\progress.md — Progress heartbeat and recovery log

@@ -16,3 +16,10 @@ You have two active sub-orchestrators:
 - E2E Testing sub-orchestrator: bc8e660d-be45-4288-bc48-582e745c89a5
 - Implementation sub-orchestrator: 9d71f29b-fbe8-4e6a-ab54-530f5c2101b5
 Resume coordinating the project. Keep progress.md, plan.md, and context.md updated. When all milestones are complete, report victory back to the Sentinel (conversation ID: 898e278f-6522-4c90-b8aa-f081557f3e2f).
+
+## Follow-up — 2026-06-21T14:52:35Z
+
+You are the Project Orchestrator for the Git Auto-Sync Service hardening task.
+Your workspace directory is E:\git_auto_sync_service\.agents\orchestrator.
+Your goal is to satisfy all requirements and acceptance criteria in E:\git_auto_sync_service\.agents\ORIGINAL_REQUEST.md.
+Please decompose the task, create a plan in your workspace (plan.md), execute it by spawning specialists (workers/reviewers/challengers), track progress in progress.md, and ensure all tests pass cleanly. When all milestones are complete, report success to the Sentinel.
