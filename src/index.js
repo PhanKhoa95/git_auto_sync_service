@@ -269,15 +269,17 @@ function startServer(port) {
           registerChildProcess(child);
 
           const clientCloseHandler = () => {
-            if (child.exitCode === null && child.signalCode === null) {
-              logger.warn(`Client disconnected during clone. Killing process ${child.pid}...`);
-              try {
-                child.kill();
-              } catch (err) {}
+            if (!res.writableEnded) {
+              if (child.exitCode === null && child.signalCode === null) {
+                logger.warn(`Client disconnected during clone. Killing process ${child.pid}...`);
+                try {
+                  child.kill();
+                } catch (err) {}
+              }
             }
           };
 
-          req.on('close', clientCloseHandler);
+          res.on('close', clientCloseHandler);
 
           child.stdout.on('data', data => {
             res.write(data);
@@ -293,7 +295,7 @@ function startServer(port) {
           });
 
           child.on('close', code => {
-            req.off('close', clientCloseHandler);
+            res.off('close', clientCloseHandler);
             if (code === 0) {
               res.write(`\n[SUCCESS] Repository cloned successfully.\n`);
               try {
@@ -354,16 +356,18 @@ function startServer(port) {
           let isDisconnected = false;
 
           const clientCloseHandler = () => {
-            isDisconnected = true;
-            if (currentChild && currentChild.exitCode === null && currentChild.signalCode === null) {
-              logger.warn(`Client disconnected during publish. Killing process ${currentChild.pid}...`);
-              try {
-                currentChild.kill();
-              } catch (err) {}
+            if (!res.writableEnded) {
+              isDisconnected = true;
+              if (currentChild && currentChild.exitCode === null && currentChild.signalCode === null) {
+                logger.warn(`Client disconnected during publish. Killing process ${currentChild.pid}...`);
+                try {
+                  currentChild.kill();
+                } catch (err) {}
+              }
             }
           };
 
-          req.on('close', clientCloseHandler);
+          res.on('close', clientCloseHandler);
 
           function spawnAndStream(cmd, args) {
             return new Promise((resolve, reject) => {
@@ -452,7 +456,7 @@ function startServer(port) {
             } catch (err) {
               res.write(`\n[ERROR] Publish sequence failed: ${err.message}\n`);
             } finally {
-              req.off('close', clientCloseHandler);
+              res.off('close', clientCloseHandler);
               res.end();
             }
           })();
