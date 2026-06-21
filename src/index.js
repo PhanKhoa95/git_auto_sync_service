@@ -162,6 +162,57 @@ function startServer(port) {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('');
       }
+    } else if (req.method === 'POST' && reqPath === '/api/open-folder') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.repoPath) throw new Error('Missing repoPath.');
+          const { execFile } = require('child_process');
+          execFile('explorer.exe', [parsed.repoPath]);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
+    } else if (req.method === 'POST' && reqPath === '/api/set-remote') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.repoPath || !parsed.remoteUrl) {
+            throw new Error('Missing repoPath or remoteUrl.');
+          }
+          const { execFileSync } = require('child_process');
+          
+          // Check if remote origin exists
+          let hasOrigin = false;
+          try {
+            execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: parsed.repoPath, stdio: 'ignore' });
+            hasOrigin = true;
+          } catch (err) {}
+          
+          if (hasOrigin) {
+            execFileSync('git', ['remote', 'set-url', 'origin', parsed.remoteUrl], { cwd: parsed.repoPath });
+          } else {
+            execFileSync('git', ['remote', 'add', 'origin', parsed.remoteUrl], { cwd: parsed.repoPath });
+          }
+          
+          // Trigger repo scan to update metadata
+          const { forceGlobalScan } = require('./repo-watcher');
+          forceGlobalScan(BASE_DIR);
+          
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
     } else if (req.method === 'POST' && reqPath === '/api/sync') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
