@@ -139,9 +139,38 @@ class E2ETestHarness {
       this.daemonOutput += data.toString();
     });
 
+    this.daemonProcess.on('error', (err) => {
+      this.daemonOutput += `[SPAWN ERROR] ${err.message}\n`;
+    });
+
+    this.daemonProcess.on('exit', (code, signal) => {
+      this.daemonOutput += `[PROCESS EXIT] code: ${code}, signal: ${signal}\n`;
+    });
+
     // Wait 300ms to allow Windows to bind fs.watch before the test continues
     const start = Date.now();
     while (Date.now() - start < 300) {}
+  }
+
+  /**
+   * Polls the daemon output and logs to wait until it is fully initialized and watching.
+   */
+  async waitForDaemonReady(timeoutMs = 20000) {
+    const start = Date.now();
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    while (Date.now() - start < timeoutMs) {
+      const log = this.readLog();
+      const hasWatcher = this.daemonOutput.includes('Setting up recursive file watcher') || log.includes('Setting up recursive file watcher');
+      const hasNoRepos = this.daemonOutput.includes('No active Git repositories were detected') || log.includes('No active Git repositories were detected');
+      const hasDashboard = this.daemonOutput.includes('Dashboard server running');
+      if (hasWatcher || hasNoRepos || hasDashboard) {
+        // Wait an extra 200ms to allow OS watcher binding to fully settle
+        await delay(200);
+        return;
+      }
+      await delay(100);
+    }
+    throw new Error("Daemon did not become ready within timeout. Output: " + this.daemonOutput);
   }
 
   /**

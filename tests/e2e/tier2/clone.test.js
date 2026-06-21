@@ -34,13 +34,13 @@ describe('Clone API Functional Tests', function () {
     // The remote bare repository path
     const remoteRepoPath = path.join(harness.remotesPath, mockRepoName + '.git');
 
-    // 2. Start the daemon with the HTTP server enabled on port 3099
+    // 2. Start the daemon with the HTTP server enabled on port 3091
     harness.startDaemon({
       START_SERVER: 'true',
-      PORT: '3099',
+      PORT: '3091',
       DEBOUNCE_DELAY: '500'
     });
-    await delay(1000); // wait for server to bind
+    await harness.waitForDaemonReady();
 
     // 3. Make HTTP POST request to /api/clone
     const postData = JSON.stringify({
@@ -51,7 +51,7 @@ describe('Clone API Functional Tests', function () {
 
     const options = {
       hostname: '127.0.0.1',
-      port: 3099,
+      port: 3091,
       path: '/api/clone',
       method: 'POST',
       headers: {
@@ -104,10 +104,10 @@ describe('Clone API Functional Tests', function () {
 
     harness.startDaemon({
       START_SERVER: 'true',
-      PORT: '3099',
+      PORT: '3092',
       DEBOUNCE_DELAY: '500'
     });
-    await delay(1000);
+    await harness.waitForDaemonReady();
 
     const postData = JSON.stringify({
       cloneUrl: 'https://github.com/phankhoa95/test.git',
@@ -117,7 +117,7 @@ describe('Clone API Functional Tests', function () {
 
     const options = {
       hostname: '127.0.0.1',
-      port: 3099,
+      port: 3092,
       path: '/api/clone',
       method: 'POST',
       headers: {

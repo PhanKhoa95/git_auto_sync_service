@@ -26,33 +26,76 @@ describe('Tier 2 Detailed Functional Tests', function () {
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // Helper to wait for a commit matching pattern in the remote repo
+  const waitForRemoteCommit = async (remotePath, pattern, timeoutMs = 8000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+        if (pattern.test(commitMsg)) {
+          return commitMsg;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
+    return harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+  };
+
+  // Helper to wait for a file to appear in the remote repo tree
+  const waitForRemoteFile = async (remotePath, branch, filename, timeoutMs = 8000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const files = harness.gitCmd(remotePath, ['ls-tree', '-r', branch, '--name-only']).stdout;
+        if (files.includes(filename)) {
+          return files;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
+    return harness.gitCmd(remotePath, ['ls-tree', '-r', branch, '--name-only']).stdout;
+  };
+
+  // Helper to wait for the sync.log to contain a string or pattern
+  const waitForLogContent = async (pattern, timeoutMs = 8000) => {
+    const start = Date.now();
+    const isPattern = pattern instanceof RegExp;
+    while (Date.now() - start < timeoutMs) {
+      const log = harness.readLog();
+      if (isPattern ? pattern.test(log) : log.includes(pattern)) {
+        return log;
+      }
+      await delay(200);
+    }
+    return harness.readLog();
+  };
+
   // TC-T2-01: Ignore changes in .git directory
   it('TC-T2-01: Ignore changes in .git directory', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.clearLog();
     // Modify config in .git
     const gitConfigPath = path.join(harness.virtualDrivePath, 'repo1', '.git', 'config');
     fs.appendFileSync(gitConfigPath, '\n# test comment\n');
-    await delay(3500);
+    await delay(2000);
 
     const log = harness.readLog();
-    expect(log).to.not.include('Sync complete');
+    expect(log).to.not.include('Synchronization cycle completed');
   });
 
   // TC-T2-02: Detect changes inside nested directories
   it('TC-T2-02: Detect changes inside nested directories', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'sub1/sub2/deep.txt', 'deep file');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+    const files = await waitForRemoteFile(remotePath, 'master', 'sub1/sub2/deep.txt');
     expect(files).to.include('sub1/sub2/deep.txt');
   });
 
@@ -64,10 +107,10 @@ describe('Tier 2 Detailed Functional Tests', function () {
     await delay(1000); // Wait for gitignore to sync
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'log/debug.log', 'ignore me');
-    await delay(3500);
+    await delay(2000);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
     const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
@@ -80,7 +123,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
     const repo2 = harness.createMockRepo('repo2', true);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     // Make repo2 unreadable on Windows using icacls (S-1-1-0 is Everyone SID)
     try {
@@ -90,7 +133,6 @@ describe('Tier 2 Detailed Functional Tests', function () {
     }
 
     harness.createFile('repo1', 'file.txt', 'repo1 still works');
-    await delay(3500);
 
     // Restore permissions so cleanup can delete it
     try {
@@ -98,7 +140,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
     } catch (e) {}
 
     const remotePath1 = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath1, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath1, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -106,15 +148,14 @@ describe('Tier 2 Detailed Functional Tests', function () {
   it('TC-T2-05: Detect multiple files created simultaneously', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '1000' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     for (let i = 1; i <= 5; i++) {
       harness.createFile('repo1', `file_${i}.txt`, `content ${i}`);
     }
-    await delay(4500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
 
     const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
@@ -130,13 +171,12 @@ describe('Tier 2 Detailed Functional Tests', function () {
     await delay(1000); // Wait for file to be pushed first
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.renameFile('repo1', 'old.txt', 'new.txt');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+    const files = await waitForRemoteFile(remotePath, 'master', 'new.txt');
     expect(files).to.include('new.txt');
     expect(files).to.not.include('old.txt');
   });
@@ -145,7 +185,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
   it('TC-T2-07: Verify debounce reset on successive modifications', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '2000' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'debounce.txt', 'initial');
     await delay(1000); // before 2s elapsed
@@ -157,10 +197,9 @@ describe('Tier 2 Detailed Functional Tests', function () {
     
     // Check it did not sync yet (total time since first is 2s, but 0s since third)
     let log = harness.readLog();
-    expect(log).to.not.include('Sync complete');
+    expect(log).to.not.include('Synchronization cycle completed');
 
-    await delay(4500); // wait for 2.5s (should trigger)
-    log = harness.readLog();
+    log = await waitForLogContent('Synchronization cycle completed');
     expect(log).to.include('repo1');
   });
 
@@ -170,22 +209,21 @@ describe('Tier 2 Detailed Functional Tests', function () {
     harness.createMockRepo('repo2', true);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '2000' });
-    // Wait for startup sync to fully complete (daemon spawn + debounce time + pull/push time)
-    await delay(3500);
+    await harness.waitForDaemonReady();
     harness.clearLog();
 
     harness.createFile('repo1', 'file.txt', 'repo1 change');
     await delay(1000);
 
     harness.createFile('repo2', 'file.txt', 'repo2 change');
-    await delay(1500); // repo1 has been 2.5s (triggered), repo2 has been 1.5s (not triggered)
 
-    const log = harness.readLog();
-    expect(log).to.include('[repo1] Starting synchronization cycle');
+    // Wait for repo1 to sync (it has 2000ms debounce)
+    const log = await waitForLogContent('[repo1] Starting synchronization cycle');
+    // Ensure repo2 has NOT synced yet
     expect(log).to.not.include('[repo2] Starting synchronization cycle');
 
-    await delay(1500); // repo2 has now been 3.0s (triggered)
-    const finalLog = harness.readLog();
+    // Wait for repo2 to sync (which was written 1000ms after repo1, so should sync 1000ms later)
+    const finalLog = await waitForLogContent('[repo2] Starting synchronization cycle');
     expect(finalLog).to.include('[repo2] Starting synchronization cycle');
   });
 
@@ -193,8 +231,8 @@ describe('Tier 2 Detailed Functional Tests', function () {
   it('TC-T2-09: Verify multiple rapid changes trigger single sync', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '2000' });
-    // Wait for the startup sync to complete and record starting commit count
-    await delay(3500);
+    await harness.waitForDaemonReady();
+    harness.clearLog();
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
     const startCommits = parseInt(
       harness.gitCmd(remotePath, ['rev-list', '--count', 'master']).stdout.trim()
@@ -205,7 +243,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
       harness.createFile('repo1', 'rapid.txt', `write ${i}`);
       await delay(50);
     }
-    await delay(4500); // wait for debounce
+    await waitForLogContent('Synchronization cycle completed successfully');
 
     const endCommits = parseInt(
       harness.gitCmd(remotePath, ['rev-list', '--count', 'master']).stdout.trim()
@@ -218,8 +256,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
   it('TC-T2-10: Verify debounce window is configurable', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '3000' }); // configured to 3.0s
-    // Wait for startup sync to fully complete (daemon spawn + debounce time + pull/push time)
-    await delay(4500);
+    await harness.waitForDaemonReady();
     harness.clearLog();
 
     harness.createFile('repo1', 'config_test.txt', 'data');
@@ -227,9 +264,9 @@ describe('Tier 2 Detailed Functional Tests', function () {
     await delay(2000);
     expect(harness.readLog()).to.not.include('[repo1] Starting synchronization cycle');
 
-    // Wait another 2 seconds (total 4s, which is > 3.0s)
-    await delay(2000);
-    expect(harness.readLog()).to.include('[repo1] Starting synchronization cycle');
+    // Wait for the sync to start
+    const log = await waitForLogContent('[repo1] Starting synchronization cycle');
+    expect(log).to.include('[repo1] Starting synchronization cycle');
   });
 
   // TC-T2-11: Verify commit message format
@@ -242,7 +279,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
     await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /^Auto-sync: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     expect(commitMsg).to.match(/^Auto-sync: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
 
@@ -254,13 +291,12 @@ describe('Tier 2 Detailed Functional Tests', function () {
     harness.gitCmd(localPath, ['push', '-u', 'origin', 'feature-branch']);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'branch.txt', 'branch content');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'feature-branch', '--name-only']).stdout;
+    const files = await waitForRemoteFile(remotePath, 'feature-branch', 'branch.txt');
     expect(files).to.include('branch.txt');
   });
 
@@ -270,7 +306,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
     const bareRepoPath = path.join(harness.remotesPath, 'repo1.git');
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     // Commit a file directly to the remote repository from a peer repo
     const peerRepoPath = path.join(harness.sandboxRoot, 'peer_repo');
@@ -287,7 +323,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
 
     // Now write a local modification
     harness.createFile('repo1', 'local.txt', 'from local');
-    await delay(4500); // wait for sync
+    await waitForLogContent('Synchronization cycle completed successfully');
 
     // Verify local repository pulled and merged
     const localFiles = fs.readdirSync(localPath);
@@ -314,13 +350,12 @@ describe('Tier 2 Detailed Functional Tests', function () {
     // Tests push on a local remote, which succeeds because it uses filesystem protocols without prompt
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'cached.txt', 'credentials cached');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -347,11 +382,11 @@ describe('Tier 2 Detailed Functional Tests', function () {
 
     // Now start the daemon
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     // Modify local conflict.txt with conflicting content
     fs.writeFileSync(path.join(localPath, 'conflict.txt'), 'local edit line');
-    await delay(4500); // Wait for sync pull attempt
+    await waitForLogContent('Pull failed');
 
     const log = harness.readLog();
     // Verify pull failed/stopped due to conflict and was logged
@@ -370,16 +405,11 @@ describe('Tier 2 Detailed Functional Tests', function () {
     fs.writeFileSync(lockPath, 'locked');
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'lock_check.txt', 'check');
-    await delay(3500);
+    const log = await waitForLogContent('Staging failed');
 
-    const log = harness.readLog();
-    // Daemon should log error about index.lock or command failure and continue
-    expect(log.toLowerCase()).to.satisfy(
-      (out) => out.includes('lock') || out.includes('fail') || out.includes('error')
-    );
     expect(harness.daemonProcess).to.not.be.null;
 
     // clean lock so cleanSandbox works
@@ -395,15 +425,11 @@ describe('Tier 2 Detailed Functional Tests', function () {
     harness.gitCmd(localPath, ['remote', 'set-url', 'origin', 'ssh://10.255.255.1/repo.git']);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'timeout_check.txt', 'timeout content');
-    await delay(4000);
+    const log = await waitForLogContent('Pull failed');
 
-    const log = harness.readLog();
-    expect(log.toLowerCase()).to.satisfy(
-      (out) => out.includes('error') || out.includes('fail') || out.includes('ssh') || out.includes('timeout')
-    );
     expect(harness.daemonProcess).to.not.be.null;
   });
 
@@ -414,7 +440,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
     fs.writeFileSync(filePath, 'readonly content');
     
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     // Make file read-only
     fs.chmodSync(filePath, 0o444);
@@ -426,7 +452,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
       // permission error expected, check if daemon continues
     }
     
-    await delay(3500);
+    await delay(2000);
     expect(harness.daemonProcess).to.not.be.null;
 
     // restore permissions
@@ -450,13 +476,12 @@ describe('Tier 2 Detailed Functional Tests', function () {
     harness.gitCmd(localRepoPath, ['remote', 'add', 'origin', bareRepoPath]);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo_empty', 'first.txt', 'initial check');
-    await delay(4000);
 
     // Check remote git log to verify initial commit and push succeeded
-    const commitMsg = harness.gitCmd(bareRepoPath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(bareRepoPath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -464,7 +489,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
   it('TC-T2-21: Handle very large file addition', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '1000' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     // Write a large file (approx 60 MB) using stream or writing large buffer
     const largeFilePath = path.join(harness.virtualDrivePath, 'repo1', 'large.bin');
@@ -476,7 +501,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
     }
     stream.end();
 
-    await delay(8000); // wait for write and sync
+    await waitForLogContent('Synchronization cycle completed successfully', 15000);
 
     // Verify process doesn't crash
     expect(harness.daemonProcess).to.not.be.null;

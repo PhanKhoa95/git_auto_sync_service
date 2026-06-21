@@ -51,6 +51,52 @@ function getRemoteOriginUrl(repoPath) {
   return null;
 }
 
+/**
+ * Scans the .git folder for any stale .lock files (e.g. index.lock) older than 10 seconds and unlinks them.
+ */
+function clearStaleGitLocks(repoPath) {
+  try {
+    const gitDir = path.join(repoPath, '.git');
+    if (!fs.existsSync(gitDir)) return;
+    
+    const items = fs.readdirSync(gitDir);
+    for (const item of items) {
+      if (item.endsWith('.lock')) {
+        const lockPath = path.join(gitDir, item);
+        try {
+          const stats = fs.statSync(lockPath);
+          const ageMs = Date.now() - stats.mtimeMs;
+          if (ageMs > 10000) { // 10 seconds
+            logger.warn(`[${path.basename(repoPath)}] Stale git lock file found: ${item} (age: ${Math.round(ageMs / 1000)}s). Removing to self-fix...`);
+            fs.unlinkSync(lockPath);
+            logger.info(`[${path.basename(repoPath)}] Stale lock file ${item} removed successfully.`);
+          }
+        } catch (e) {
+          logger.warn(`[${path.basename(repoPath)}] Failed to read/delete stale lock file ${item}: ${e.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn(`[${path.basename(repoPath)}] Failed to clean stale git locks: ${err.message}`);
+  }
+}
+
+/**
+ * Checks if a merge is in progress and aborts it to keep the repository clean.
+ */
+async function abortMergeIfNeeded(repoPath, repoName) {
+  try {
+    const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+    if (fs.existsSync(mergeHeadPath)) {
+      logger.warn(`[${repoName}] Merge conflict or active merge state detected. Aborting merge to restore clean state...`);
+      await runGit(repoPath, ['merge', '--abort']);
+      logger.info(`[${repoName}] Merge aborted successfully.`);
+    }
+  } catch (abortErr) {
+    logger.warn(`[${repoName}] Failed to abort merge: ${abortErr.error ? abortErr.error.message : abortErr}`);
+  }
+}
+
 
 /**
  * Automatically detects symbolic links and directory junctions in the repo
@@ -195,6 +241,9 @@ async function performSync(repoPath) {
     return;
   }
 
+  // Clear any stale git lock files left by crashed processes
+  clearStaleGitLocks(repoPath);
+
   try {
     // Exclude any symbolic links or directory junctions to avoid circular recursion loops
     excludeSymlinks(repoPath);
@@ -234,8 +283,19 @@ async function performSync(repoPath) {
         // If the remote branch doesn't exist yet (e.g. empty repository/new branch), proceed instead of failing
         if (stderr.includes("couldn't find remote ref") || stderr.includes("no such ref") || stderr.includes("find remote ref")) {
           logger.warn(`[${repoName}] Remote branch ${branch} not found on origin. Proceeding with initial sync.`);
+        } else if (stderr.includes("refusing to merge unrelated histories")) {
+          logger.warn(`[${repoName}] Unrelated histories detected. Autopilot self-fixing: retrying pull with --allow-unrelated-histories...`);
+          try {
+            await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
+            logger.info(`[${repoName}] Pull with unrelated histories successful.`);
+          } catch (retryErr) {
+            logger.error(`[${repoName}] Pull with unrelated histories failed: ${retryErr.error ? retryErr.error.message : retryErr}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
+            await abortMergeIfNeeded(repoPath, repoName);
+            return;
+          }
         } else {
-          logger.error(`[${repoName}] Pull failed: ${err.error.message}. Output: ${err.stderr.trim()}`);
+          logger.error(`[${repoName}] Pull failed: ${err.error ? err.error.message : err}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
+          await abortMergeIfNeeded(repoPath, repoName);
           logger.warn(`[${repoName}] Skipping remainder of synchronization cycle to prevent conflict compounding.`);
           return;
         }
@@ -300,8 +360,33 @@ async function performSync(repoPath) {
         await runGit(repoPath, ['push', 'origin', branch]);
         logger.info(`[${repoName}] Push successful.`);
       } catch (err) {
-        logger.error(`[${repoName}] Push failed: ${err.error.message}. Output: ${err.stderr.trim()}`);
-        return;
+        const stderr = (err.stderr || '').toLowerCase();
+        if (stderr.includes('non-fast-forward') || stderr.includes('updates were rejected') || stderr.includes('fetch first')) {
+          logger.warn(`[${repoName}] Push rejected due to non-fast-forward. Autopilot self-fixing: pulling remote changes and retrying push...`);
+          try {
+            try {
+              await runGit(repoPath, ['pull', 'origin', branch]);
+            } catch (pullErr) {
+              const pullStderr = (pullErr.stderr || '').toLowerCase();
+              if (pullStderr.includes('refusing to merge unrelated histories')) {
+                logger.warn(`[${repoName}] Unrelated histories during push retry. Pulling with --allow-unrelated-histories...`);
+                await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
+              } else {
+                throw pullErr;
+              }
+            }
+            logger.info(`[${repoName}] Pull successful. Re-trying push...`);
+            await runGit(repoPath, ['push', 'origin', branch]);
+            logger.info(`[${repoName}] Push successful after retrying.`);
+          } catch (retryErr) {
+            logger.error(`[${repoName}] Pull/push recovery failed: ${retryErr.error ? retryErr.error.message : retryErr}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
+            await abortMergeIfNeeded(repoPath, repoName);
+            return;
+          }
+        } else {
+          logger.error(`[${repoName}] Push failed: ${err.error.message}. Output: ${err.stderr.trim()}`);
+          return;
+        }
       }
     }
 

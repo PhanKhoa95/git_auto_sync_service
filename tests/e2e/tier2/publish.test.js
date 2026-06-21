@@ -42,13 +42,13 @@ describe('Publish API Functional Tests', function () {
     // Configure user info globally (or locally inside the test runner process env)
     // The harness already sets environment overrides so git uses the correct non-interactive configs.
 
-    // 3. Start the daemon with the HTTP server enabled on port 3099
+    // 3. Start the daemon with the HTTP server enabled on port 3093
     harness.startDaemon({
       START_SERVER: 'true',
-      PORT: '3099',
+      PORT: '3093',
       DEBOUNCE_DELAY: '500'
     });
-    await delay(1000);
+    await harness.waitForDaemonReady();
 
     // 4. Make HTTP POST request to /api/publish
     const postData = JSON.stringify({
@@ -58,7 +58,7 @@ describe('Publish API Functional Tests', function () {
 
     const options = {
       hostname: '127.0.0.1',
-      port: 3099,
+      port: 3093,
       path: '/api/publish',
       method: 'POST',
       headers: {
@@ -119,10 +119,10 @@ describe('Publish API Functional Tests', function () {
 
     harness.startDaemon({
       START_SERVER: 'true',
-      PORT: '3099',
+      PORT: '3094',
       DEBOUNCE_DELAY: '500'
     });
-    await delay(1000);
+    await harness.waitForDaemonReady();
 
     const postData = JSON.stringify({
       localPath: localGitProj,
@@ -131,7 +131,7 @@ describe('Publish API Functional Tests', function () {
 
     const options = {
       hostname: '127.0.0.1',
-      port: 3099,
+      port: 3094,
       path: '/api/publish',
       method: 'POST',
       headers: {

@@ -27,35 +27,77 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   // Helper to wait
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // Helper to wait for a commit matching pattern in the remote repo
+  const waitForRemoteCommit = async (remotePath, pattern, timeoutMs = 8000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+        if (pattern.test(commitMsg)) {
+          return commitMsg;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
+    return harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+  };
+
+  // Helper to wait for a file to appear in the remote repo tree
+  const waitForRemoteFile = async (remotePath, branch, filename, timeoutMs = 8000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const files = harness.gitCmd(remotePath, ['ls-tree', '-r', branch, '--name-only']).stdout;
+        if (files.includes(filename)) {
+          return files;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
+    return harness.gitCmd(remotePath, ['ls-tree', '-r', branch, '--name-only']).stdout;
+  };
+
+  // Helper to wait for the sync.log to contain a string or pattern
+  const waitForLogContent = async (pattern, timeoutMs = 8000) => {
+    const start = Date.now();
+    const isPattern = pattern instanceof RegExp;
+    while (Date.now() - start < timeoutMs) {
+      const log = harness.readLog();
+      if (isPattern ? pattern.test(log) : log.includes(pattern)) {
+        return log;
+      }
+      await delay(200);
+    }
+    return harness.readLog();
+  };
+
   // TC-T1-01: Detect file creation in root repo
   it('TC-T1-01: Detect file creation in root repo', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500); // wait for daemon to start
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'test1.txt', 'hello world');
-    await delay(3500); // wait for debounce and sync
+
+    // Check that remote has the commit
+    const remotePath = path.join(harness.remotesPath, 'repo1.git');
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
+    expect(commitMsg).to.match(/Auto-sync:/);
 
     const log = harness.readLog();
     expect(log).to.include('repo1');
-    
-    // Check that remote has the commit
-    const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
-    expect(commitMsg).to.match(/Auto-sync:/);
   });
 
   // TC-T1-02: Detect file modification in root repo
   it('TC-T1-02: Detect file modification in root repo', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'init.txt', 'updated content');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -63,13 +105,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-03: Detect file deletion in root repo', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.deleteFile('repo1', 'init.txt');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -81,13 +122,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
     
     harness.createMockRepo('level1_dir/repo2', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('level1_dir/repo2', 'test2.txt', 'level 1 test');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'level1_dir/repo2.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -98,13 +138,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
 
     harness.createMockRepo('level1_dir/repo2', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('level1_dir/repo2', 'init.txt', 'updated level 1 test');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'level1_dir/repo2.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -115,13 +154,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
 
     harness.createMockRepo('level1_dir/repo2', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.deleteFile('level1_dir/repo2', 'init.txt');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'level1_dir/repo2.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -131,7 +169,7 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
     fs.mkdirSync(nonGitPath, { recursive: true });
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     fs.writeFileSync(path.join(nonGitPath, 'file.txt'), 'ignore me');
     await delay(3500);
@@ -146,7 +184,7 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
     fs.mkdirSync(level2Path, { recursive: true });
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     fs.writeFileSync(path.join(level2Path, 'file.txt'), 'ignore me too');
     await delay(3500);
@@ -159,13 +197,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-09: Detect subfolder creation in git repo', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'new_folder/file.txt', 'nested file');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -173,7 +210,7 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-10: Trigger sync after debounce elapsed', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '3000' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     const t0 = Date.now();
     harness.createFile('repo1', 'test.txt', 'debounce check');
@@ -181,11 +218,10 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
     // Wait 2 seconds (less than 3s debounce delay)
     await delay(2000);
     let log = harness.readLog();
-    expect(log).to.not.include('Sync complete'); // Should not have finished
+    expect(log).to.not.include('Synchronization cycle completed'); // Should not have finished
 
-    // Wait another 2 seconds (total 4s, which is > 3s)
-    await delay(2000);
-    log = harness.readLog();
+    // Wait for the sync to complete
+    log = await waitForLogContent('Synchronization cycle completed');
     expect(log).to.include('repo1');
   });
 
@@ -193,27 +229,26 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-11: Verify debounce queue holds changes', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '3000' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'test.txt', 'hold changes check');
     await delay(1000);
 
     const log = harness.readLog();
     // Verify sync has not triggered yet because debounce is 3s
-    expect(log).to.not.include('Sync complete');
+    expect(log).to.not.include('Starting synchronization cycle');
   });
 
   // TC-T1-12: Stage new untracked files
   it('TC-T1-12: Stage new untracked files', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'new.txt', 'untracked');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+    const files = await waitForRemoteFile(remotePath, 'master', 'new.txt');
     expect(files).to.include('new.txt');
   });
 
@@ -221,14 +256,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-13: Commit created with automatic timestamp', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'time.txt', 'timestamp test');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
-    // Format should match Auto-sync: YYYY-MM-DD HH:MM:SS
+    const commitMsg = await waitForRemoteCommit(remotePath, /^Auto-sync: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     expect(commitMsg).to.match(/^Auto-sync: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
 
@@ -236,13 +269,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-14: Push to mock remote origin succeeds', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'push.txt', 'push content');
-    await delay(3500);
 
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
   });
 
@@ -250,29 +282,27 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-15: Pull from remote origin runs before pushing', async () => {
     harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'pull_check.txt', 'check');
-    await delay(3500);
+    const log = await waitForLogContent('Synchronization cycle completed successfully');
 
-    const log = harness.readLog();
-    const pullIndex = log.indexOf('git pull');
-    const pushIndex = log.indexOf('git push');
-    if (pullIndex !== -1 && pushIndex !== -1) {
-      expect(pullIndex).to.be.below(pushIndex);
-    }
+    const pullIndex = log.indexOf('Pulling latest changes');
+    const pushIndex = log.indexOf('Pushing changes');
+    expect(pullIndex).to.not.equal(-1);
+    expect(pushIndex).to.not.equal(-1);
+    expect(pullIndex).to.be.below(pushIndex);
   });
 
   // TC-T1-16: Daemon continues when repo has no remote
   it('TC-T1-16: Daemon continues when repo has no remote', async () => {
     harness.createMockRepo('repo_no_remote', false);
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo_no_remote', 'no_remote.txt', 'no remote content');
-    await delay(3500);
+    const log = await waitForLogContent('Synchronization cycle completed successfully');
 
-    const log = harness.readLog();
     // Commit should succeed, push skipped, and daemon should stay active
     expect(log).to.include('repo_no_remote');
     expect(harness.daemonProcess).to.not.be.null;
@@ -285,13 +315,12 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
     harness.gitCmd(localPath, ['remote', 'set-url', 'origin', 'invalid_path_to_remote']);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'fail.txt', 'trigger fail');
-    await delay(3500);
+    const log = await waitForLogContent('Pull failed');
 
     // Daemon should log git failure and remain running
-    const log = harness.readLog();
     expect(log).to.include('repo1');
     expect(harness.daemonProcess).to.not.be.null;
   });
@@ -302,12 +331,11 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
     harness.gitCmd(localPath, ['remote', 'set-url', 'origin', 'invalid_path_to_remote']);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'error_log_check.txt', 'error check');
-    await delay(3500);
+    const log = await waitForLogContent('Pull failed');
 
-    const log = harness.readLog();
     expect(log.toLowerCase()).to.include('error');
   });
 
@@ -315,7 +343,7 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
   it('TC-T1-19: Handle repo deletion during debounce window', async () => {
     const localPath = harness.createMockRepo('repo1', true);
     harness.startDaemon({ DEBOUNCE_DELAY: '3000' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     harness.createFile('repo1', 'temp.txt', 'temp file');
     await delay(500);
@@ -323,9 +351,8 @@ describe('Tier 1 Sanity & Smoke Tests', function () {
     // Delete repository directory before debounce ends
     harness.deleteRepo('repo1');
 
-    await delay(3500); // wait for original debounce window to elapse
-
-    // Daemon should skip repo and not crash
+    // Wait for daemon to log skipping repository
+    const log = await waitForLogContent('Repository path does not exist. Skipping sync');
     expect(harness.daemonProcess).to.not.be.null;
   });
 
