@@ -121,6 +121,8 @@ if (process.env.START_SERVER === 'true' || (process.env.NODE_ENV !== 'test' && !
   startServer(defaultPort);
 }
 
+let keepAliveInterval = null;
+
 // Scan and watch repositories
 const watchers = watchRepositories(BASE_DIR);
 
@@ -129,7 +131,7 @@ if (watchers.size === 0) {
   logger.warn('The daemon will remain active in the background and check for changes.');
   
   // Keep the event loop alive if no watchers are active
-  const keepAliveInterval = setInterval(() => {
+  keepAliveInterval = setInterval(() => {
     logger.debug('Daemon heartbeat check - no repositories currently watched.');
   }, 300000); // 5 minutes heartbeat
   
@@ -140,6 +142,10 @@ if (watchers.size === 0) {
 // Graceful shutdown registration
 function handleShutdown(signal) {
   logger.info(`Received ${signal}. Shutting down daemon gracefully...`);
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+  }
   stopWatching();
   logger.info('Daemon stopped.');
   process.exit(0);
