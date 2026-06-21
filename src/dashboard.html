@@ -367,6 +367,14 @@
       color: var(--text-muted);
     }
 
+    .repo-path:hover {
+      color: var(--accent-color) !important;
+    }
+    
+    .repo-path:hover svg {
+      fill: var(--accent-color) !important;
+    }
+
     .repo-url {
       color: var(--accent-color);
       text-decoration: none;
@@ -824,8 +832,8 @@
         // Handle online URL for link & button
         const onlineUrl = getOnlineGitUrl(remoteUrl);
         const formattedUrl = onlineUrl 
-          ? `<a href="${onlineUrl}" target="_blank" class="repo-url">${remoteUrl}</a>`
-          : `<span style="color: var(--text-muted); font-style: italic;">${remoteUrl}</span>`;
+          ? `<a href="${onlineUrl}" target="_blank" class="repo-url" style="display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${remoteUrl}</a>`
+          : `<span style="color: var(--text-muted); font-style: italic; display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${remoteUrl}</span>`;
 
         const onlineButtonHtml = onlineUrl
           ? `<a href="${onlineUrl}" target="_blank" class="btn btn-sm" style="background: rgba(0, 242, 254, 0.08); border-color: rgba(0, 242, 254, 0.2); color: var(--accent-color);">
@@ -848,9 +856,23 @@
                 <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
                 ${folderName}
               </div>
-              <div class="repo-path">${repoPath}</div>
+              <div class="repo-path" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.25rem; transition: color 0.15s ease;" onclick="openLocalFolder('${repoPath.replace(/\\/g, '\\\\')}')" title="Open local folder in Windows File Explorer">
+                <svg style="width: 12px; height: 12px; fill: currentColor; opacity: 0.7; transition: fill 0.15s ease;" viewBox="0 0 24 24">
+                  <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z"/>
+                </svg>
+                <span class="path-text" style="text-decoration: underline; text-underline-offset: 2px;">${repoPath}</span>
+              </div>
             </td>
-            <td>${formattedUrl}</td>
+            <td>
+              <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                ${formattedUrl}
+                <button class="btn btn-sm" style="padding: 0.25rem 0.3rem; background: transparent; border: none; cursor: pointer; color: var(--text-muted); transition: color 0.15s ease;" onclick="editRemoteUrl('${repoPath.replace(/\\/g, '\\\\')}', '${remoteUrl === 'No remote origin configured' ? '' : remoteUrl.replace(/'/g, "\\'")}')" title="Configure Git remote URL">
+                  <svg style="width: 13px; height: 13px; fill: currentColor;" viewBox="0 0 24 24">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
             <td style="text-align: right;">
               <div style="display: inline-flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
                 ${onlineButtonHtml}
@@ -988,6 +1010,40 @@
         }
       } catch (err) {
         console.error('Failed to clear logs:', err);
+      }
+    }
+
+    async function openLocalFolder(repoPath) {
+      try {
+        await fetch('/api/open-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoPath })
+        });
+      } catch (err) {
+        console.error('Failed to open local folder:', err);
+      }
+    }
+
+    async function editRemoteUrl(repoPath, currentUrl) {
+      const newUrl = prompt(`Enter new Git remote origin URL for repository:\n${repoPath}`, currentUrl);
+      if (newUrl === null) return;
+      
+      try {
+        const response = await fetch('/api/set-remote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoPath, remoteUrl: newUrl.trim() })
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert('Remote URL updated successfully!');
+          fetchData();
+        } else {
+          alert(`Failed to update remote URL: ${result.message}`);
+        }
+      } catch (err) {
+        alert(`Error updating remote URL: ${err.message}`);
       }
     }
 
