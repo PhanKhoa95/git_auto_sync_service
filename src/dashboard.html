@@ -766,6 +766,37 @@
       statLastScan.textContent = lastScanDate.toLocaleTimeString();
     }
 
+    // Helper to convert SSH or HTTPS remote URL to a browseable web URL
+    function getOnlineGitUrl(remoteUrl) {
+      if (!remoteUrl || remoteUrl === 'No remote origin configured') return null;
+      remoteUrl = remoteUrl.trim();
+      
+      // If it's already an http/https url, just remove trailing .git and return
+      if (remoteUrl.startsWith('http://') || remoteUrl.startsWith('https://')) {
+        return remoteUrl.replace(/\.git$/, '');
+      }
+      
+      // If it's a standard SSH url like git@github.com:user/repo.git
+      // or ssh://git@github.com/user/repo.git
+      if (remoteUrl.startsWith('git@') || remoteUrl.startsWith('ssh://')) {
+        let cleanUrl = remoteUrl;
+        if (cleanUrl.startsWith('ssh://')) {
+          cleanUrl = cleanUrl.substring(6); // remove ssh://
+        }
+        // Remove git@
+        if (cleanUrl.startsWith('git@')) {
+          cleanUrl = cleanUrl.substring(4);
+        }
+        // Replace first ':' with '/'
+        cleanUrl = cleanUrl.replace(':', '/');
+        // Remove trailing .git
+        cleanUrl = cleanUrl.replace(/\.git$/, '');
+        return 'https://' + cleanUrl;
+      }
+      
+      return null;
+    }
+
     // Render repository list
     function updateRepoTable(repos) {
       const repoPaths = Object.keys(repos);
@@ -789,10 +820,26 @@
         const repo = repos[repoPath];
         const folderName = repoPath.split('\\').pop() || repoPath.split('/').pop() || repoPath;
         const remoteUrl = repo.remoteOrigin || 'No remote origin configured';
-        const isClickableUrl = remoteUrl.startsWith('http') || remoteUrl.startsWith('git@');
-        const formattedUrl = isClickableUrl 
-          ? `<a href="${remoteUrl.replace(/\.git$/, '')}" target="_blank" class="repo-url">${remoteUrl}</a>`
+        
+        // Handle online URL for link & button
+        const onlineUrl = getOnlineGitUrl(remoteUrl);
+        const formattedUrl = onlineUrl 
+          ? `<a href="${onlineUrl}" target="_blank" class="repo-url">${remoteUrl}</a>`
           : `<span style="color: var(--text-muted); font-style: italic;">${remoteUrl}</span>`;
+
+        const onlineButtonHtml = onlineUrl
+          ? `<a href="${onlineUrl}" target="_blank" class="btn btn-sm" style="background: rgba(0, 242, 254, 0.08); border-color: rgba(0, 242, 254, 0.2); color: var(--accent-color);">
+              <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
+                <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+              </svg>
+              Git Online
+             </a>`
+          : `<button class="btn btn-sm" disabled style="opacity: 0.45; cursor: not-allowed; pointer-events: none;" title="No online remote configured">
+              <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
+                <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+              </svg>
+              Git Online
+             </button>`;
 
         html += `
           <tr>
@@ -805,7 +852,10 @@
             </td>
             <td>${formattedUrl}</td>
             <td style="text-align: right;">
-              <button class="btn btn-sm btn-primary" onclick="forceRepoSync('${repoPath.replace(/\\/g, '\\\\')}')">Sync Now</button>
+              <div style="display: inline-flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                ${onlineButtonHtml}
+                <button class="btn btn-sm btn-primary" onclick="forceRepoSync('${repoPath.replace(/\\/g, '\\\\')}')">Sync Now</button>
+              </div>
             </td>
           </tr>
         `;
