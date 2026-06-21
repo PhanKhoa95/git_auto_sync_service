@@ -2,19 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 const { syncRepository } = require('./git-sync');
+const { getConfig } = require('./config-manager');
 
 const watchers = new Map();      // repoPath -> FSWatcher instance
 const debounceTimers = new Map(); // repoPath -> setTimeout ID
 let scanInterval = null;
 let lastScanTime = Date.now();
 
-
 /**
  * Normalizes and checks if a file change event should be ignored.
- * We ignore:
- * - Changes inside the .git/ folder
- * - Changes inside the .agents/ folder
- * - Changes to the sync.log file itself (to prevent logging loop)
  */
 function isIgnored(filename, repoPath) {
   if (!filename) return false;
@@ -37,13 +33,16 @@ function isIgnored(filename, repoPath) {
     return true;
   }
 
-  // Split path by '/' and check if any segment is '.git', '.agents', or '.sync.lock'
+  // Split path by '/' and check if any segment matches ignored patterns
   const segments = normalized.split('/');
-  if (segments.includes('.git') || segments.includes('.agents') || segments.includes('.sync.lock')) {
+  const config = getConfig();
+  const ignoredPatterns = config.ignoredPatterns || ['.git', '.agents', '.sync.lock'];
+  
+  if (segments.some(segment => ignoredPatterns.includes(segment) || segment === '.sync.lock')) {
     return true;
   }
 
-  // 3. Ignore changes to the sync.log file itself
+  // Ignore changes to the sync.log file itself
   const absolutePath = path.resolve(repoPath, filename);
   const logFileAbsolute = path.resolve(process.env.TEST_LOG_FILE || process.env.SYNC_LOG_PATH || 'E:\\git_auto_sync_service\\sync.log');
   if (absolutePath === logFileAbsolute) {
@@ -54,14 +53,15 @@ function isIgnored(filename, repoPath) {
 }
 
 /**
- * Triggers sync with a 10-second debounce mechanism.
+ * Triggers sync with a configurable debounce mechanism.
  */
 function triggerSync(repoPath) {
   if (debounceTimers.has(repoPath)) {
     clearTimeout(debounceTimers.get(repoPath));
   }
 
-  const debounceTime = parseInt(process.env.DEBOUNCE_DELAY, 10) || parseInt(process.env.SYNC_DEBOUNCE_MS, 10) || 10000;
+  const config = getConfig();
+  const debounceTime = config.debounceDelayMs || 10000;
   
   const timerId = setTimeout(async () => {
     debounceTimers.delete(repoPath);
@@ -76,9 +76,9 @@ function triggerSync(repoPath) {
 }
 
 /**
- * Scans the base directory and its level-1 children for Git repositories.
+ * Scans a single root directory and its level-1 children for Git repositories.
  */
-function findGitRepositories(baseDir) {
+function findGitRepositoriesForRoot(baseDir) {
   const repos = [];
 
   try {
@@ -87,7 +87,6 @@ function findGitRepositories(baseDir) {
       return repos;
     }
 
-    // Helper to check if a directory is a Git repository
     const isGitRepo = (dir) => {
       try {
         const gitDir = path.join(dir, '.git');
@@ -97,12 +96,10 @@ function findGitRepositories(baseDir) {
       }
     };
 
-    // 1. Check if the root baseDir itself is a Git repository
     if (isGitRepo(baseDir)) {
       repos.push(baseDir);
     }
 
-    // 2. Scan level-1 items
     let level1Items;
     try {
       level1Items = fs.readdirSync(baseDir);
@@ -127,11 +124,9 @@ function findGitRepositories(baseDir) {
       }
 
       if (stat.isDirectory()) {
-        // Check if level-1 directory is a Git repo
         if (isGitRepo(fullPath)) {
           repos.push(fullPath);
         } else {
-          // 3. Scan inside this level-1 subfolder (level-1 subfolder children)
           let level2Items;
           try {
             level2Items = fs.readdirSync(fullPath);
@@ -161,10 +156,25 @@ function findGitRepositories(baseDir) {
 }
 
 /**
+ * Scans all configured roots and returns unique Git repositories.
+ */
+function findGitRepositories() {
+  const config = getConfig();
+  const roots = config.monitoredRoots || ['E:\\'];
+  const allRepos = [];
+
+  for (const root of roots) {
+    allRepos.push(...findGitRepositoriesForRoot(root));
+  }
+
+  return [...new Set(allRepos)];
+}
+
+/**
  * Dynamic scan updates watchers to add new repos and stop watching removed ones.
  */
-function updateWatchers(baseDir) {
-  const currentRepos = findGitRepositories(baseDir);
+function updateWatchers() {
+  const currentRepos = findGitRepositories();
 
   // 1. Start watching new repositories
   for (const repoPath of currentRepos) {
@@ -203,7 +213,7 @@ function startWatchingRepo(repoPath) {
 
     watchers.set(repoPath, watcher);
 
-    // Initial check on startup: trigger sync only if there are pending local changes (Required by TC-T4-05)
+    // Initial check on startup: trigger sync only if there are pending local changes
     const { runGit } = require('./git-sync');
     runGit(repoPath, ['status', '--porcelain']).then(({ stdout }) => {
       if (stdout.trim()) {
@@ -239,22 +249,30 @@ function stopWatchingRepo(repoPath) {
  * Scans and starts watching detected Git repositories, and runs periodic scan.
  */
 function watchRepositories(baseDir) {
-  logger.info(`Initializing repo watcher on: ${baseDir}`);
+  // If baseDir is provided as a single string (from legacy/test setups), ensure it is in monitoredRoots
+  if (baseDir) {
+    const config = getConfig();
+    if (!config.monitoredRoots.includes(baseDir)) {
+      config.monitoredRoots = [baseDir];
+    }
+  }
+
+  const roots = getConfig().monitoredRoots;
+  logger.info(`Initializing repo watcher on roots: ${roots.join(', ')}`);
   lastScanTime = Date.now();
   
   // Perform initial scan and start watchers
-  updateWatchers(baseDir);
+  updateWatchers();
 
   // Start 30-second periodic scan interval
   scanInterval = setInterval(() => {
-    logger.info(`Running periodic 30-second repository scan under ${baseDir}...`);
+    logger.info(`Running periodic 30-second repository scan under monitored roots...`);
     lastScanTime = Date.now();
-    updateWatchers(baseDir);
+    updateWatchers();
   }, 30000);
 
   return watchers;
 }
-
 
 /**
  * Stops all active file watchers and intervals.
@@ -265,6 +283,13 @@ function stopWatching() {
     clearInterval(scanInterval);
     scanInterval = null;
   }
+  stopAllWatchersOnly();
+}
+
+/**
+ * Stop active file watchers only (helper for reload).
+ */
+function stopAllWatchersOnly() {
   for (const [repoPath, watcher] of watchers) {
     const repoName = path.basename(repoPath);
     try {
@@ -275,6 +300,15 @@ function stopWatching() {
     }
   }
   watchers.clear();
+}
+
+/**
+ * Reloads watchers dynamically based on new configuration.
+ */
+function reloadWatcher() {
+  logger.info('Reloading repository watchers dynamically...');
+  stopAllWatchersOnly();
+  updateWatchers();
 }
 
 function getWatchedRepositoriesMetadata() {
@@ -291,10 +325,10 @@ function getWatchedRepositoriesMetadata() {
   };
 }
 
-function forceGlobalScan(baseDir) {
-  logger.info(`Forcing repository scan under ${baseDir}...`);
+function forceGlobalScan() {
+  logger.info(`Forcing repository scan under monitored roots...`);
   lastScanTime = Date.now();
-  updateWatchers(baseDir);
+  updateWatchers();
 }
 
 module.exports = {
@@ -303,6 +337,6 @@ module.exports = {
   isIgnored,
   findGitRepositories,
   getWatchedRepositoriesMetadata,
-  forceGlobalScan
+  forceGlobalScan,
+  reloadWatcher
 };
-

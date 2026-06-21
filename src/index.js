@@ -69,6 +69,10 @@ logger.info(`Operating System: ${process.platform} (${process.arch})`);
 logger.info(`Monitoring Root: ${BASE_DIR}`);
 logger.info(`==================================================`);
 
+// Load configuration
+const { loadConfig } = require('./config-manager');
+loadConfig();
+
 // Scan and watch repositories
 const watchers = watchRepositories(BASE_DIR);
 
@@ -135,6 +139,46 @@ function startServer(port) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Dashboard HTML file not found.');
       }
+    } else if (req.method === 'GET' && reqPath === '/api/config') {
+      const { getConfig } = require('./config-manager');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(getConfig()));
+    } else if (req.method === 'POST' && reqPath === '/api/config') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (typeof parsed.debounceDelayMs !== 'number' || parsed.debounceDelayMs < 100) {
+            throw new Error('debounceDelayMs must be a number greater than 100.');
+          }
+          if (!Array.isArray(parsed.monitoredRoots) || parsed.monitoredRoots.length === 0) {
+            throw new Error('monitoredRoots must be a non-empty array of strings.');
+          }
+          if (!Array.isArray(parsed.ignoredPatterns)) {
+            throw new Error('ignoredPatterns must be an array of strings.');
+          }
+
+          const { saveConfig } = require('./config-manager');
+          const success = saveConfig({
+            debounceDelayMs: parsed.debounceDelayMs,
+            monitoredRoots: parsed.monitoredRoots,
+            ignoredPatterns: parsed.ignoredPatterns
+          });
+
+          if (success) {
+            const { reloadWatcher } = require('./repo-watcher');
+            reloadWatcher();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+          } else {
+            throw new Error('Failed to write configuration file.');
+          }
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
     } else if (req.method === 'GET' && reqPath === '/api/status') {
       const { getWatchedRepositoriesMetadata } = require('./repo-watcher');
       const metadata = getWatchedRepositoriesMetadata();
