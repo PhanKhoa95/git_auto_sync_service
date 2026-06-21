@@ -315,7 +315,27 @@ function startServer(port) {
               await spawnAndStream('git', ['add', '.']);
 
               // 3. git commit
-              await spawnAndStream('git', ['commit', '-m', 'Initial commit from Auto-Sync Dashboard']);
+              try {
+                await spawnAndStream('git', ['commit', '-m', 'Initial commit from Auto-Sync Dashboard']);
+              } catch (commitErr) {
+                res.write(`[INFO] Commit failed. Checking if Git identity is missing...\n`);
+                let hasUser = false;
+                try {
+                  const { execSync } = require('child_process');
+                  const configuredName = execSync('git config user.name', { cwd: parsed.localPath, stdio: 'pipe' }).toString().trim();
+                  if (configuredName) hasUser = true;
+                } catch (e) {}
+
+                if (!hasUser) {
+                  res.write(`[WARN] Git identity not found. Autopilot self-fixing: configuring local fallback user...\n`);
+                  await spawnAndStream('git', ['config', 'user.name', 'Auto-Sync Autopilot']);
+                  await spawnAndStream('git', ['config', 'user.email', 'autopilot@sync.local']);
+                  res.write(`[INFO] Retrying git commit...\n`);
+                  await spawnAndStream('git', ['commit', '-m', 'Initial commit from Auto-Sync Dashboard']);
+                } else {
+                  throw commitErr;
+                }
+              }
 
               // 4. git branch -M main
               await spawnAndStream('git', ['branch', '-M', 'main']);

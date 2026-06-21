@@ -274,8 +274,23 @@ async function performSync(repoPath) {
       await runGit(repoPath, ['commit', '-m', commitMessage]);
       logger.info(`[${repoName}] Commit successful.`);
     } catch (err) {
-      logger.error(`[${repoName}] Commit failed: ${err.error.message}`);
-      return;
+      const stderr = (err.stderr || '').toLowerCase();
+      if (stderr.includes('tell me who you are') || stderr.includes('author identity unknown')) {
+        logger.warn(`[${repoName}] Git user identity not configured. Autopilot self-fixing: configuring local fallback user...`);
+        try {
+          await runGit(repoPath, ['config', 'user.name', 'Auto-Sync Autopilot']);
+          await runGit(repoPath, ['config', 'user.email', 'autopilot@sync.local']);
+          // Retry commit
+          await runGit(repoPath, ['commit', '-m', commitMessage]);
+          logger.info(`[${repoName}] Commit successful after identity self-fixing.`);
+        } catch (retryErr) {
+          logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${retryErr.error.message || retryErr}`);
+          return;
+        }
+      } else {
+        logger.error(`[${repoName}] Commit failed: ${err.error.message || err}`);
+        return;
+      }
     }
 
     // 6. Push to remote (if origin is configured)
