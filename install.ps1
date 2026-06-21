@@ -82,7 +82,7 @@ if (-not $TestMode) {
         $WshShell = New-Object -ComObject WScript.Shell
         $Shortcut = $WshShell.CreateShortcut($DesktopPath)
         $Shortcut.TargetPath = "cmd.exe"
-        $Shortcut.Arguments = "/c start http://localhost:3000"
+        $Shortcut.Arguments = "/c start http://localhost:9999"
         $Shortcut.Description = "Open Git Auto-Sync Dashboard"
         $Shortcut.IconLocation = "shell32.dll,13"
         $Shortcut.Save()

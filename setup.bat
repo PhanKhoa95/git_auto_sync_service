@@ -42,7 +42,7 @@ echo.
 
 :: Open Dashboard automatically in the default browser
 echo [INFO] Opening Web Dashboard...
-start http://localhost:3000
+start http://localhost:9999
 
 echo ==================================================
 echo     Autopilot Setup Completed Successfully!        
