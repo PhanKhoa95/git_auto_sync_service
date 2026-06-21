@@ -2,7 +2,7 @@
   "debounceDelayMs": 10000,
   "monitoredRoots": [
     "E:\\",
-    "E:\\Thư mục mới"
+    "C:\\Users\\pkhoa\\OneDrive\\Documents\\multi-sale-organizer-main\\multi-sale-organizer-main"
   ],
   "ignoredPatterns": [
     ".git",
