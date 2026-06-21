@@ -13,7 +13,7 @@ let lastScanTime = Date.now();
  * Normalizes and checks if a file change event should be ignored.
  */
 function isIgnored(filename, repoPath) {
-  if (!filename) return false;
+  if (!filename) return true; // Ignore null filenames to prevent infinite watcher loops on Windows
 
   // Resolve absolute paths and namespace prefixes to relative paths
   let relativeFilename = filename;

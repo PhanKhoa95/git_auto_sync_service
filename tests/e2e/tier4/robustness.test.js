@@ -26,6 +26,21 @@ describe('Tier 4 Robustness & Failure Recovery Tests', function () {
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // Helper to wait for a commit matching pattern in the remote repo
+  const waitForRemoteCommit = async (remotePath, pattern, timeoutMs = 8000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+        if (pattern.test(commitMsg)) {
+          return commitMsg;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
+    return harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+  };
+
   // TC-T4-01: Git executable missing recovery
   it('TC-T4-01: Git executable missing recovery', async () => {
     harness.createMockRepo('repo1', true);
@@ -157,7 +172,7 @@ class GitWrapper
     harness.createMockRepo('repo2', true);
 
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(500);
+    await harness.waitForDaemonReady();
 
     // Corrupt repo1/.git/HEAD
     const headPath = path.join(repo1, '.git', 'HEAD');
@@ -169,17 +184,15 @@ class GitWrapper
     // Modify file in healthy repo2
     harness.createFile('repo2', 'healthy_test.txt', 'should pass');
 
-    await delay(4000); // Wait for both syncs
+    // Verify repo2 remote has the commit via dynamic polling
+    const remotePath2 = path.join(harness.remotesPath, 'repo2.git');
+    const commitMsg2 = await waitForRemoteCommit(remotePath2, /Auto-sync:/);
+    expect(commitMsg2).to.match(/Auto-sync:/);
 
     // repo1 sync should fail/log error, repo2 should succeed
     const log = harness.readLog();
     expect(log).to.include('repo2'); // repo2 synced
     expect(harness.daemonProcess).to.not.be.null; // stays alive
-
-    // Verify repo2 remote has the commit
-    const remotePath2 = path.join(harness.remotesPath, 'repo2.git');
-    const commitMsg2 = harness.gitCmd(remotePath2, ['log', '-1', '--pretty=%B']).stdout.trim();
-    expect(commitMsg2).to.match(/Auto-sync:/);
   });
 
   // TC-T4-03: Disk full condition
