@@ -102,7 +102,14 @@ describe('Publish API Functional Tests', function () {
     expect(fs.existsSync(path.join(localProjPath, '.git'))).to.be.true;
 
     // 7. Verify the remote repository has received the commit
-    const commitMsg = harness.gitCmd(bareRepoPath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    let commitMsg = '';
+    try {
+      commitMsg = harness.gitCmd(bareRepoPath, ['log', '-1', '--pretty=%B', 'main']).stdout.trim();
+    } catch (err) {
+      console.log('FAILED to read git log main:', err);
+      console.log('DAEMON RESPONSE was:', result);
+      throw err;
+    }
     expect(commitMsg).to.equal('Initial commit from Auto-Sync Dashboard');
   });
 
