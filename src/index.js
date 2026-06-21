@@ -4,6 +4,17 @@ const http = require('http');
 const logger = require('./logger');
 const { watchRepositories, stopWatching } = require('./repo-watcher');
 
+const activeChildProcesses = new Set();
+
+function registerChildProcess(child) {
+  activeChildProcesses.add(child);
+  const cleanup = () => {
+    activeChildProcesses.delete(child);
+  };
+  child.on('close', cleanup);
+  child.on('exit', cleanup);
+}
+
 
 // Base directory configurable via env, defaulting to 'E:\'
 const BASE_DIR = process.env.TEST_E_DRIVE_PATH || 'E:\\';
@@ -124,30 +135,23 @@ if (process.env.START_SERVER === 'true' || (process.env.NODE_ENV !== 'test' && !
   startServer(defaultPort);
 }
 
-let keepAliveInterval = null;
-
 // Scan and watch repositories
 const watchers = watchRepositories(BASE_DIR);
 
 if (watchers.size === 0) {
   logger.warn('No active Git repositories were detected initially.');
   logger.warn('The daemon will remain active in the background and check for changes.');
-  
-  // Keep the event loop alive if no watchers are active
-  keepAliveInterval = setInterval(() => {
-    logger.debug('Daemon heartbeat check - no repositories currently watched.');
-  }, 300000); // 5 minutes heartbeat
-  
-  // Make sure process doesn't exit by keeping the interval unreferenced or referenced.
-  // Leaving it referenced ensures the process stays alive even if there are no file watchers.
 }
 
 // Graceful shutdown registration
 function handleShutdown(signal) {
   logger.info(`Received ${signal}. Shutting down daemon gracefully...`);
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-    keepAliveInterval = null;
+  for (const child of activeChildProcesses) {
+    if (child.exitCode === null && child.signalCode === null) {
+      try {
+        child.kill('SIGTERM');
+      } catch (err) {}
+    }
   }
   stopWatching();
   logger.info('Daemon stopped.');
@@ -262,6 +266,18 @@ function startServer(port) {
 
           const { spawn } = require('child_process');
           const child = spawn('git', ['clone', '--progress', parsed.cloneUrl, destPath]);
+          registerChildProcess(child);
+
+          const clientCloseHandler = () => {
+            if (child.exitCode === null && child.signalCode === null) {
+              logger.warn(`Client disconnected during clone. Killing process ${child.pid}...`);
+              try {
+                child.kill();
+              } catch (err) {}
+            }
+          };
+
+          req.on('close', clientCloseHandler);
 
           child.stdout.on('data', data => {
             res.write(data);
@@ -277,6 +293,7 @@ function startServer(port) {
           });
 
           child.on('close', code => {
+            req.off('close', clientCloseHandler);
             if (code === 0) {
               res.write(`\n[SUCCESS] Repository cloned successfully.\n`);
               try {
@@ -333,10 +350,30 @@ function startServer(port) {
             }
           };
 
+          let currentChild = null;
+          let isDisconnected = false;
+
+          const clientCloseHandler = () => {
+            isDisconnected = true;
+            if (currentChild && currentChild.exitCode === null && currentChild.signalCode === null) {
+              logger.warn(`Client disconnected during publish. Killing process ${currentChild.pid}...`);
+              try {
+                currentChild.kill();
+              } catch (err) {}
+            }
+          };
+
+          req.on('close', clientCloseHandler);
+
           function spawnAndStream(cmd, args) {
             return new Promise((resolve, reject) => {
+              if (isDisconnected) {
+                return reject(new Error('Client disconnected'));
+              }
               res.write(`\n[INFO] Running: ${cmd} ${args.join(' ')}\n`);
               const child = spawn(cmd, args, opts);
+              currentChild = child;
+              registerChildProcess(child);
 
               child.stdout.on('data', data => {
                 res.write(data);
@@ -352,6 +389,7 @@ function startServer(port) {
               });
 
               child.on('close', code => {
+                currentChild = null;
                 if (code === 0) {
                   resolve();
                 } else {
@@ -414,6 +452,7 @@ function startServer(port) {
             } catch (err) {
               res.write(`\n[ERROR] Publish sequence failed: ${err.message}\n`);
             } finally {
+              req.off('close', clientCloseHandler);
               res.end();
             }
           })();
@@ -426,12 +465,20 @@ function startServer(port) {
     } else if (req.method === 'GET' && reqPath === '/api/status') {
       const { getWatchedRepositoriesMetadata } = require('./repo-watcher');
       const metadata = getWatchedRepositoriesMetadata();
+      const logPath = logger.getLogFilePath();
+      let logSize = 0;
+      if (fs.existsSync(logPath)) {
+        try {
+          logSize = fs.statSync(logPath).size;
+        } catch (e) {}
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         pid: process.pid,
         baseDir: BASE_DIR,
         watchedRepositories: metadata.watchedRepositories,
-        lastScanTime: metadata.lastScanTime
+        lastScanTime: metadata.lastScanTime,
+        logSize
       }));
     } else if (req.method === 'GET' && reqPath === '/api/logs') {
       const logPath = logger.getLogFilePath();

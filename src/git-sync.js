@@ -3,6 +3,18 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
+function getErrorMessage(err) {
+  if (!err) return 'Unknown error';
+  if (err.error && err.error.message) return err.error.message;
+  if (err.message) return err.message;
+  if (typeof err === 'object') {
+    try {
+      return JSON.stringify(err);
+    } catch (e) {}
+  }
+  return String(err);
+}
+
 const lastSyncTimes = new Map(); // repoPath -> ISOString
 
 function getLastSyncTime(repoPath) {
@@ -78,12 +90,12 @@ function clearStaleGitLocks(repoPath) {
             logger.info(`[${path.basename(repoPath)}] Stale lock file ${item} removed successfully.`);
           }
         } catch (e) {
-          logger.warn(`[${path.basename(repoPath)}] Failed to read/delete stale lock file ${item}: ${e.message}`);
+          logger.warn(`[${path.basename(repoPath)}] Failed to read/delete stale lock file ${item}: ${getErrorMessage(e)}`);
         }
       }
     }
   } catch (err) {
-    logger.warn(`[${path.basename(repoPath)}] Failed to clean stale git locks: ${err.message}`);
+    logger.warn(`[${path.basename(repoPath)}] Failed to clean stale git locks: ${getErrorMessage(err)}`);
   }
 }
 
@@ -99,7 +111,7 @@ async function abortMergeIfNeeded(repoPath, repoName) {
       logger.info(`[${repoName}] Merge aborted successfully.`);
     }
   } catch (abortErr) {
-    logger.warn(`[${repoName}] Failed to abort merge: ${abortErr.error ? abortErr.error.message : abortErr}`);
+    logger.warn(`[${repoName}] Failed to abort merge: ${getErrorMessage(abortErr)}`);
   }
 }
 
@@ -148,7 +160,7 @@ function excludeSymlinks(repoPath) {
       fs.writeFileSync(excludePath, excludes.join('\n') + '\n', 'utf8');
     }
   } catch (err) {
-    logger.warn(`Failed to configure symlink excludes: ${err.message}`);
+    logger.warn(`Failed to configure symlink excludes: ${getErrorMessage(err)}`);
   }
 }
 
@@ -214,10 +226,10 @@ function syncRepository(repoPath) {
     try {
       await performSync(repoPath);
     } catch (err) {
-      logger.error(`[${repoName}] Unexpected error during sync: ${err.message || err}`);
+      logger.error(`[${repoName}] Unexpected error during sync: ${getErrorMessage(err)}`);
     }
   }).catch((err) => {
-    logger.error(`[${repoName}] Critical queue chain error: ${err.message || err}`);
+    logger.error(`[${repoName}] Critical queue chain error: ${getErrorMessage(err)}`);
   });
 
   // Save the new chain
@@ -261,7 +273,7 @@ async function performSync(repoPath) {
         const { stdout } = await runGit(repoPath, ['rev-parse', '--abbrev-ref', 'HEAD']);
         branch = stdout.trim();
       } catch (err) {
-        logger.error(`[${repoName}] Failed to get current branch name: ${err.error.message}`);
+        logger.error(`[${repoName}] Failed to get current branch name: ${getErrorMessage(err)}`);
         return;
       }
     }
@@ -295,12 +307,12 @@ async function performSync(repoPath) {
             await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
             logger.info(`[${repoName}] Pull with unrelated histories successful.`);
           } catch (retryErr) {
-            logger.error(`[${repoName}] Pull with unrelated histories failed: ${retryErr.error ? retryErr.error.message : retryErr}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
+            logger.error(`[${repoName}] Pull with unrelated histories failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
             return;
           }
         } else {
-          logger.error(`[${repoName}] Pull failed: ${err.error ? err.error.message : err}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
+          logger.error(`[${repoName}] Pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
           await abortMergeIfNeeded(repoPath, repoName);
           logger.warn(`[${repoName}] Skipping remainder of synchronization cycle to prevent conflict compounding.`);
           return;
@@ -314,7 +326,7 @@ async function performSync(repoPath) {
       const { stdout } = await runGit(repoPath, ['status', '--porcelain']);
       statusOutput = stdout.trim();
     } catch (err) {
-      logger.error(`[${repoName}] Failed to check status: ${err.error.message}`);
+      logger.error(`[${repoName}] Failed to check status: ${getErrorMessage(err)}`);
       return;
     }
 
@@ -329,7 +341,7 @@ async function performSync(repoPath) {
     try {
       await runGit(repoPath, ['add', '-A']);
     } catch (err) {
-      logger.error(`[${repoName}] Staging failed: ${err.error.message}`);
+      logger.error(`[${repoName}] Staging failed: ${getErrorMessage(err)}`);
       return;
     }
 
@@ -351,11 +363,11 @@ async function performSync(repoPath) {
           await runGit(repoPath, ['commit', '-m', commitMessage]);
           logger.info(`[${repoName}] Commit successful after identity self-fixing.`);
         } catch (retryErr) {
-          logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${retryErr.error.message || retryErr}`);
+          logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${getErrorMessage(retryErr)}`);
           return;
         }
       } else {
-        logger.error(`[${repoName}] Commit failed: ${err.error.message || err}`);
+        logger.error(`[${repoName}] Commit failed: ${getErrorMessage(err)}`);
         return;
       }
     }
@@ -386,12 +398,12 @@ async function performSync(repoPath) {
             await runGit(repoPath, ['push', 'origin', branch]);
             logger.info(`[${repoName}] Push successful after retrying.`);
           } catch (retryErr) {
-            logger.error(`[${repoName}] Pull/push recovery failed: ${retryErr.error ? retryErr.error.message : retryErr}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
+            logger.error(`[${repoName}] Pull/push recovery failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
             return;
           }
         } else {
-          logger.error(`[${repoName}] Push failed: ${err.error.message}. Output: ${err.stderr.trim()}`);
+          logger.error(`[${repoName}] Push failed: ${getErrorMessage(err)}. Output: ${err.stderr.trim()}`);
           return;
         }
       }
@@ -400,7 +412,7 @@ async function performSync(repoPath) {
     logger.info(`[${repoName}] Synchronization cycle completed successfully.`);
     lastSyncTimes.set(repoPath, new Date().toISOString());
   } catch (err) {
-    logger.error(`[${repoName}] Unexpected error during sync: ${err.message || err}`);
+    logger.error(`[${repoName}] Unexpected error during sync: ${getErrorMessage(err)}`);
   }
 }
 
