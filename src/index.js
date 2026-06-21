@@ -374,7 +374,7 @@ function startServer(port) {
 }
 
 // Start Dashboard HTTP Server if not running in test mode
-if (process.env.NODE_ENV !== 'test' && !process.env.TEST_E_DRIVE_PATH) {
+if (process.env.START_SERVER === 'true' || (process.env.NODE_ENV !== 'test' && !process.env.TEST_E_DRIVE_PATH)) {
   const defaultPort = parseInt(process.env.PORT, 10) || 3000;
   startServer(defaultPort);
 }
