@@ -38,6 +38,10 @@ echo [3/3] Verifying service status...
 powershell -NoProfile -ExecutionPolicy Bypass -File .\verify_sync.ps1
 echo.
 
+:: Open Dashboard automatically in the default browser
+echo [INFO] Opening Web Dashboard...
+start http://localhost:3000
+
 echo ==================================================
 echo     Autopilot Setup Completed Successfully!        
 echo ==================================================

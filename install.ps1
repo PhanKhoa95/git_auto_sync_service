@@ -74,5 +74,23 @@ if (-not (Test-Path $LogPath)) {
     }
 }
 
+# 6. Create Desktop Shortcut for Web Dashboard
+if (-not $TestMode) {
+    Write-Host "[+] Creating Desktop Shortcut for Web Dashboard..."
+    try {
+        $DesktopPath = [System.IO.Path]::Combine([System.Environment]::GetFolderPath('Desktop'), "Git Sync Dashboard.lnk")
+        $WshShell = New-Object -ComObject WScript.Shell
+        $Shortcut = $WshShell.CreateShortcut($DesktopPath)
+        $Shortcut.TargetPath = "cmd.exe"
+        $Shortcut.Arguments = "/c start http://localhost:3000"
+        $Shortcut.Description = "Open Git Auto-Sync Dashboard"
+        $Shortcut.IconLocation = "shell32.dll,13"
+        $Shortcut.Save()
+        Write-Host "[+] Created desktop shortcut: $DesktopPath"
+    } catch {
+        Write-Warning "Could not create Desktop shortcut: $_"
+    }
+}
+
 Write-Host "[SUCCESS] Git Auto-Sync Service installation completed!"
 exit 0
