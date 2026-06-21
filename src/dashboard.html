@@ -547,6 +547,103 @@
       color: var(--accent-color);
       text-decoration: none;
     }
+
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(11, 12, 16, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .modal-card {
+      background: rgba(30, 32, 48, 0.9);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      border-radius: 20px;
+      padding: 2.2rem;
+      width: 520px;
+      max-width: 90%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-input {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 0.6rem;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .form-help {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .root-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .root-group-header {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent-color);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 1.5rem 0 0.5rem 0;
+      padding: 0.5rem;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      border-left: 3px solid var(--accent-color);
+    }
+    
+    .root-group-header svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
   </style>
 </head>
 <body>
@@ -568,6 +665,12 @@
       </div>
 
       <div style="display: flex; align-items: center; gap: 1rem;">
+        <button class="btn btn-sm" id="btnOpenSettings">
+          <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
+            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38(1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.44-.17-.47-.41l-.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+          Settings
+        </button>
         <div class="status-badge">
           <div class="status-dot active" id="headerStatusDot"></div>
           <span id="headerStatusText">Service Active</span>
@@ -676,6 +779,44 @@
     </div>
   </div>
 
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-card">
+      <h2 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        <svg style="width: 20px; height: 20px; fill: var(--accent-color);" viewBox="0 0 24 24">
+          <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38-1.03-.7-1.62-.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+        </svg>
+        Configuration Settings
+      </h2>
+      
+      <div class="form-group">
+        <label class="form-label">Debounce Sync Delay (seconds)</label>
+        <input type="number" id="cfgDebounce" class="form-input" min="1" max="300" step="1" value="10">
+        <span class="form-help">Time to wait after file changes before pushing updates.</span>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Monitored Root Folders</label>
+        <div id="rootsListContainer" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem; max-height: 140px; overflow-y: auto;">
+          <!-- Dynamic roots inputs -->
+        </div>
+        <button class="btn btn-sm" id="btnAddRoot" style="align-self: flex-start; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);">+ Add Folder</button>
+        <span class="form-help">Root drives or folders containing your Git projects.</span>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Ignored Directory/File Patterns</label>
+        <input type="text" id="cfgIgnored" class="form-input" placeholder=".git, .agents, sync.log, node_modules">
+        <span class="form-help">Comma-separated list of directories or files to ignore.</span>
+      </div>
+      
+      <div style="display: flex; gap: 1rem; margin-top: 1rem; width: 100%;">
+        <button class="btn btn-secondary" id="btnCancelSettings" style="flex: 1; justify-content: center;">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveSettings" style="flex: 1; justify-content: center;">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer>
     <p>&copy; 2026 Antigravity Auto-Sync Service. Active in background.</p>
@@ -691,6 +832,7 @@
     let isConnected = true;
     let pollInterval = null;
     let lastLogHash = '';
+    let activeConfig = null;
 
     // Element bindings
     const headerStatusDot = document.getElementById('headerStatusDot');
@@ -751,6 +893,12 @@
     // Fetch API Data
     async function fetchData() {
       try {
+        if (!activeConfig) {
+          const configRes = await fetch('/api/config');
+          if (configRes.ok) {
+            activeConfig = await configRes.json();
+          }
+        }
         const response = await fetch(API_STATUS_URL);
         if (!response.ok) throw new Error('API server returned error status');
         const data = await response.json();
@@ -767,7 +915,11 @@
     // Update stats cards
     function updateStatusStats(data) {
       statPid.textContent = `PID: ${data.pid}`;
-      statBaseDir.textContent = data.baseDir;
+      
+      const roots = activeConfig ? activeConfig.monitoredRoots : ['E:\\'];
+      statBaseDir.textContent = roots.join(', ');
+      statBaseDir.title = roots.join(', ');
+      
       statRepoCount.textContent = Object.keys(data.watchedRepositories).length;
       
       const lastScanDate = new Date(data.lastScanTime);
@@ -805,16 +957,18 @@
       return null;
     }
 
-    // Render repository list
+    // Render repository list grouped by monitored roots
     function updateRepoTable(repos) {
       const repoPaths = Object.keys(repos);
+      const roots = activeConfig ? activeConfig.monitoredRoots : ['E:\\'];
+
       if (repoPaths.length === 0) {
         repoTableBody.innerHTML = `
           <tr>
             <td colspan="3">
               <div class="empty-state">
                 <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm-9 9H7v-2h3v2zm7 0h-5v-2h5v2zm2-7H5V10h14v2z"/></svg>
-                <p>No active Git repositories detected on E:\\</p>
+                <p>No active Git repositories detected under monitored roots</p>
                 <span style="font-size: 0.75rem; color: var(--text-muted);">Make sure your folders contain a .git directory.</span>
               </div>
             </td>
@@ -823,64 +977,105 @@
         return;
       }
 
-      let html = '';
+      // Group repositories by root folder
+      const groups = {};
+      roots.forEach(root => { groups[root] = []; });
+      groups['Other'] = [];
+
       repoPaths.forEach(repoPath => {
-        const repo = repos[repoPath];
-        const folderName = repoPath.split('\\').pop() || repoPath.split('/').pop() || repoPath;
-        const remoteUrl = repo.remoteOrigin || 'No remote origin configured';
+        let matchedRoot = '';
+        let longestLength = 0;
+        roots.forEach(root => {
+          const normRoot = root.toLowerCase().replace(/\\/g, '/').replace(/\/$/, '');
+          const normPath = repoPath.toLowerCase().replace(/\\/g, '/');
+          if (normPath.startsWith(normRoot) && root.length > longestLength) {
+            longestLength = root.length;
+            matchedRoot = root;
+          }
+        });
+        if (matchedRoot) {
+          groups[matchedRoot].push(repoPath);
+        } else {
+          groups['Other'].push(repoPath);
+        }
+      });
+
+      let html = '';
+      
+      Object.keys(groups).forEach(root => {
+        const paths = groups[root];
+        if (paths.length === 0) return; // Skip empty groups
         
-        // Handle online URL for link & button
-        const onlineUrl = getOnlineGitUrl(remoteUrl);
-        const formattedUrl = onlineUrl 
-          ? `<a href="${onlineUrl}" target="_blank" class="repo-url" style="display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${remoteUrl}</a>`
-          : `<span style="color: var(--text-muted); font-style: italic; display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${remoteUrl}</span>`;
-
-        const onlineButtonHtml = onlineUrl
-          ? `<a href="${onlineUrl}" target="_blank" class="btn btn-sm" style="background: rgba(0, 242, 254, 0.08); border-color: rgba(0, 242, 254, 0.2); color: var(--accent-color);">
-              <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
-                <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
-              </svg>
-              Git Online
-             </a>`
-          : `<button class="btn btn-sm" disabled style="opacity: 0.45; cursor: not-allowed; pointer-events: none;" title="No online remote configured">
-              <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
-                <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
-              </svg>
-              Git Online
-             </button>`;
-
+        // Render Group Header
         html += `
-          <tr>
-            <td>
-              <div class="repo-name">
-                <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                ${folderName}
-              </div>
-              <div class="repo-path" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.25rem; transition: color 0.15s ease;" onclick="openLocalFolder('${repoPath.replace(/\\/g, '\\\\')}')" title="Open local folder in Windows File Explorer">
-                <svg style="width: 12px; height: 12px; fill: currentColor; opacity: 0.7; transition: fill 0.15s ease;" viewBox="0 0 24 24">
-                  <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z"/>
-                </svg>
-                <span class="path-text" style="text-decoration: underline; text-underline-offset: 2px;">${repoPath}</span>
-              </div>
-            </td>
-            <td>
-              <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
-                ${formattedUrl}
-                <button class="btn btn-sm" style="padding: 0.25rem 0.3rem; background: transparent; border: none; cursor: pointer; color: var(--text-muted); transition: color 0.15s ease;" onclick="editRemoteUrl('${repoPath.replace(/\\/g, '\\\\')}', '${remoteUrl === 'No remote origin configured' ? '' : remoteUrl.replace(/'/g, "\\'")}')" title="Configure Git remote URL">
-                  <svg style="width: 13px; height: 13px; fill: currentColor;" viewBox="0 0 24 24">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                  </svg>
-                </button>
-              </div>
-            </td>
-            <td style="text-align: right;">
-              <div style="display: inline-flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
-                ${onlineButtonHtml}
-                <button class="btn btn-sm btn-primary" onclick="forceRepoSync('${repoPath.replace(/\\/g, '\\\\')}')">Sync Now</button>
+          <tr style="background: rgba(255, 255, 255, 0.015);">
+            <td colspan="3" style="padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+              <div class="root-group-header" style="margin: 0.3rem 0;">
+                <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z"/></svg>
+                Monitored Directory: ${root}
               </div>
             </td>
           </tr>
         `;
+
+        paths.forEach(repoPath => {
+          const repo = repos[repoPath];
+          const folderName = repoPath.split('\\').pop() || repoPath.split('/').pop() || repoPath;
+          const remoteUrl = repo.remoteOrigin || 'No remote origin configured';
+          
+          // Handle online URL for link & button
+          const onlineUrl = getOnlineGitUrl(remoteUrl);
+          const formattedUrl = onlineUrl 
+            ? `<a href="${onlineUrl}" target="_blank" class="repo-url" style="display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${remoteUrl}</a>`
+            : `<span style="color: var(--text-muted); font-style: italic; display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${remoteUrl}</span>`;
+
+          const onlineButtonHtml = onlineUrl
+            ? `<a href="${onlineUrl}" target="_blank" class="btn btn-sm" style="background: rgba(0, 242, 254, 0.08); border-color: rgba(0, 242, 254, 0.2); color: var(--accent-color);">
+                <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
+                  <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+                </svg>
+                Git Online
+               </a>`
+            : `<button class="btn btn-sm" disabled style="opacity: 0.45; cursor: not-allowed; pointer-events: none;" title="No online remote configured">
+                <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
+                  <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+                </svg>
+                Git Online
+               </button>`;
+
+          html += `
+            <tr>
+              <td>
+                <div class="repo-name">
+                  <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                  ${folderName}
+                </div>
+                <div class="repo-path" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.25rem; transition: color 0.15s ease;" onclick="openLocalFolder('${repoPath.replace(/\\/g, '\\\\')}')" title="Open local folder in Windows File Explorer">
+                  <svg style="width: 12px; height: 12px; fill: currentColor; opacity: 0.7; transition: fill 0.15s ease;" viewBox="0 0 24 24">
+                    <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z"/>
+                  </svg>
+                  <span class="path-text" style="text-decoration: underline; text-underline-offset: 2px;">${repoPath}</span>
+                </div>
+              </td>
+              <td>
+                <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                  ${formattedUrl}
+                  <button class="btn btn-sm" style="padding: 0.25rem 0.3rem; background: transparent; border: none; cursor: pointer; color: var(--text-muted); transition: color 0.15s ease;" onclick="editRemoteUrl('${repoPath.replace(/\\/g, '\\\\')}', '${remoteUrl === 'No remote origin configured' ? '' : remoteUrl.replace(/'/g, "\\'")}')" title="Configure Git remote URL">
+                    <svg style="width: 13px; height: 13px; fill: currentColor;" viewBox="0 0 24 24">
+                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                    </svg>
+                  </button>
+                </div>
+              </td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                  ${onlineButtonHtml}
+                  <button class="btn btn-sm btn-primary" onclick="forceRepoSync('${repoPath.replace(/\\/g, '\\\\')}')">Sync Now</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        });
       });
       repoTableBody.innerHTML = html;
     }
@@ -1044,6 +1239,104 @@
         }
       } catch (err) {
         alert(`Error updating remote URL: ${err.message}`);
+      }
+    }
+
+    // Settings logic
+    const settingsModal = document.getElementById('settingsModal');
+    const btnOpenSettings = document.getElementById('btnOpenSettings');
+    const btnCancelSettings = document.getElementById('btnCancelSettings');
+    const btnSaveSettings = document.getElementById('btnSaveSettings');
+    const cfgDebounce = document.getElementById('cfgDebounce');
+    const cfgIgnored = document.getElementById('cfgIgnored');
+    const rootsListContainer = document.getElementById('rootsListContainer');
+    const btnAddRoot = document.getElementById('btnAddRoot');
+
+    btnOpenSettings.addEventListener('click', openSettings);
+    btnCancelSettings.addEventListener('click', () => settingsModal.classList.remove('show'));
+    btnSaveSettings.addEventListener('click', saveSettings);
+    btnAddRoot.addEventListener('click', () => addRootRow(''));
+
+    async function openSettings() {
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          activeConfig = await response.json();
+          cfgDebounce.value = activeConfig.debounceDelayMs / 1000;
+          cfgIgnored.value = activeConfig.ignoredPatterns.join(', ');
+          
+          rootsListContainer.innerHTML = '';
+          activeConfig.monitoredRoots.forEach(root => {
+            addRootRow(root);
+          });
+          if (activeConfig.monitoredRoots.length === 0) {
+            addRootRow('');
+          }
+          
+          settingsModal.classList.add('show');
+        }
+      } catch (err) {
+        alert('Failed to load settings: ' + err.message);
+      }
+    }
+
+    function addRootRow(value) {
+      const row = document.createElement('div');
+      row.className = 'root-row';
+      row.innerHTML = `
+        <input type="text" class="form-input root-input" style="flex: 1;" value="${value.replace(/"/g, '&quot;')}" placeholder="e.g. D:\\Projects">
+        <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="padding: 0.6rem 0.8rem;">Remove</button>
+      `;
+      rootsListContainer.appendChild(row);
+    }
+
+    async function saveSettings() {
+      const debounceDelayMs = parseFloat(cfgDebounce.value) * 1000;
+      if (isNaN(debounceDelayMs) || debounceDelayMs < 100) {
+        alert('Please enter a valid debounce delay (minimum 0.1 seconds).');
+        return;
+      }
+      
+      const rootInputs = rootsListContainer.querySelectorAll('.root-input');
+      const monitoredRoots = [];
+      rootInputs.forEach(input => {
+        const val = input.value.trim();
+        if (val) monitoredRoots.push(val);
+      });
+      
+      if (monitoredRoots.length === 0) {
+        alert('Please add at least one monitored root folder.');
+        return;
+      }
+
+      const ignoredPatterns = cfgIgnored.value
+        .split(',')
+        .map(p => p.trim())
+        .filter(p => p !== '');
+
+      const newConfig = {
+        debounceDelayMs,
+        monitoredRoots,
+        ignoredPatterns
+      };
+
+      try {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newConfig)
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert('Settings saved and hot-reloaded successfully!');
+          settingsModal.classList.remove('show');
+          activeConfig = newConfig; // Update in-memory copy
+          fetchData();
+        } else {
+          alert('Failed to save settings: ' + result.message);
+        }
+      } catch (err) {
+        alert('Error saving settings: ' + err.message);
       }
     }
 
