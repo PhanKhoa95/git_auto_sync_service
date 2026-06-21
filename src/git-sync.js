@@ -58,7 +58,7 @@ function getRemoteOriginUrl(repoPath) {
 }
 
 /**
- * Scans the .git folder for any stale .lock files (e.g. index.lock) older than 10 seconds and unlinks them.
+ * Scans the .git folder for any stale .lock files (e.g. index.lock) older than 60 seconds and unlinks them.
  */
 function clearStaleGitLocks(repoPath) {
   try {
@@ -72,7 +72,7 @@ function clearStaleGitLocks(repoPath) {
         try {
           const stats = fs.statSync(lockPath);
           const ageMs = Date.now() - stats.mtimeMs;
-          if (ageMs > 10000) { // 10 seconds
+          if (ageMs > 60000) { // 60 seconds
             logger.warn(`[${path.basename(repoPath)}] Stale git lock file found: ${item} (age: ${Math.round(ageMs / 1000)}s). Removing to self-fix...`);
             fs.unlinkSync(lockPath);
             logger.info(`[${path.basename(repoPath)}] Stale lock file ${item} removed successfully.`);
