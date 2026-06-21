@@ -404,10 +404,17 @@ async function performSync(repoPath) {
   }
 }
 
+function clearRepositoryCache(repoPath) {
+  activeSyncs.delete(repoPath);
+  repoRemoteCache.delete(repoPath);
+  lastSyncTimes.delete(repoPath);
+}
+
 module.exports = {
   syncRepository,
   runGit,
   getRemoteOriginUrl,
-  getLastSyncTime
+  getLastSyncTime,
+  clearRepositoryCache
 };
 

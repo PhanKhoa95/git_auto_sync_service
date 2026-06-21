@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
-const { syncRepository } = require('./git-sync');
+const { syncRepository, clearRepositoryCache } = require('./git-sync');
 const { getConfig } = require('./config-manager');
 
 const watchers = new Map();      // repoPath -> FSWatcher instance
@@ -252,6 +252,8 @@ function stopWatchingRepo(repoPath) {
     }
     watchers.delete(repoPath);
   }
+  // Clear synchronization cache for this repository
+  clearRepositoryCache(repoPath);
 }
 
 /**
@@ -299,16 +301,10 @@ function stopWatching() {
  * Stop active file watchers only (helper for reload).
  */
 function stopAllWatchersOnly() {
-  for (const [repoPath, watcher] of watchers) {
-    const repoName = path.basename(repoPath);
-    try {
-      watcher.close();
-      logger.info(`[${repoName}] File watcher stopped.`);
-    } catch (err) {
-      logger.error(`[${repoName}] Failed to close file watcher: ${err.message}`);
-    }
+  const repoPaths = Array.from(watchers.keys());
+  for (const repoPath of repoPaths) {
+    stopWatchingRepo(repoPath);
   }
-  watchers.clear();
 }
 
 /**
