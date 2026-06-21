@@ -30,6 +30,9 @@ function isDaemonProcessRunning(pid) {
   try {
     process.kill(pid, 0);
   } catch (e) {
+    if (e.code === 'EPERM') {
+      return true;
+    }
     return false;
   }
 

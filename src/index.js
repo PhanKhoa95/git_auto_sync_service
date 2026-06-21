@@ -16,6 +16,9 @@ function isDaemonProcessRunning(pid) {
   try {
     process.kill(pid, 0);
   } catch (e) {
+    if (e.code === 'EPERM') {
+      return true;
+    }
     // Process does not exist (ESRCH) or we do not have permission
     return false;
   }

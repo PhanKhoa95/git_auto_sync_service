@@ -242,6 +242,14 @@ function startWatchingRepo(repoPath) {
  */
 function stopWatchingRepo(repoPath) {
   const repoName = path.basename(repoPath);
+
+  // Clear active debounce timer
+  const timer = debounceTimers.get(repoPath);
+  if (timer) {
+    clearTimeout(timer);
+    debounceTimers.delete(repoPath);
+  }
+
   const watcher = watchers.get(repoPath);
   if (watcher) {
     try {
