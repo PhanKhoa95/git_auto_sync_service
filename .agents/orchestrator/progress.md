@@ -1,10 +1,10 @@
 ## Hardening Status
-Last visited: 2026-06-21T15:00:00Z
+Last visited: 2026-06-21T15:10:00Z
 
 - [x] HL_EXPLORE: Explore code for leaks, races, and dashboard bloat [done]
-- [/] HL_DAEMON: Fix daemon watchers, timers, PID locks, process tracking, and error handling [in-progress]
-- [/] HL_DASHBOARD: Clean up dashboard UI and optimize communication [in-progress]
-- [ ] HL_VERIFY: E2E and memory verification, Forensic Audit [pending]
+- [x] HL_DAEMON: Fix daemon watchers, timers, PID locks, process tracking, and error handling [done]
+- [x] HL_DASHBOARD: Clean up dashboard UI and optimize communication [done]
+- [/] HL_VERIFY: E2E and memory verification, Forensic Audit [in-progress]
 
 ## Iteration Status
 Current iteration: 1 / 32

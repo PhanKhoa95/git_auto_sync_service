@@ -4,16 +4,7 @@ const http = require('http');
 const logger = require('./logger');
 const { watchRepositories, stopWatching } = require('./repo-watcher');
 
-const activeChildProcesses = new Set();
-
-function registerChildProcess(child) {
-  activeChildProcesses.add(child);
-  const cleanup = () => {
-    activeChildProcesses.delete(child);
-  };
-  child.on('close', cleanup);
-  child.on('exit', cleanup);
-}
+const { registerChildProcess, killAllChildProcesses } = require('./child-process-registry');
 
 
 // Base directory configurable via env, defaulting to 'E:\'
@@ -146,13 +137,7 @@ if (watchers.size === 0) {
 // Graceful shutdown registration
 function handleShutdown(signal) {
   logger.info(`Received ${signal}. Shutting down daemon gracefully...`);
-  for (const child of activeChildProcesses) {
-    if (child.exitCode === null && child.signalCode === null) {
-      try {
-        child.kill('SIGTERM');
-      } catch (err) {}
-    }
-  }
+  killAllChildProcesses();
   stopWatching();
   logger.info('Daemon stopped.');
   process.exit(0);
@@ -290,6 +275,7 @@ function startServer(port) {
           });
 
           child.on('error', err => {
+            res.off('close', clientCloseHandler);
             res.write(`\n[ERROR] Process error: ${err.message}\n`);
             res.end();
           });

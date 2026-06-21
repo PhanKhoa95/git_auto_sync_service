@@ -305,11 +305,8 @@ function stopWatching() {
   stopAllWatchersOnly();
 }
 
-/**
- * Stop active file watchers only (helper for reload).
- */
 function stopAllWatchersOnly() {
-  const repoPaths = Array.from(watchers.keys());
+  const repoPaths = Array.from(new Set([...watchers.keys(), ...debounceTimers.keys()]));
   for (const repoPath of repoPaths) {
     stopWatchingRepo(repoPath);
   }

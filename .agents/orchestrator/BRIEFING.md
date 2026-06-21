@@ -52,12 +52,17 @@ Plan, coordinate, and execute the Git Auto-Sync Service hardening task.
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
 | explorer_hardening | teamwork_preview_explorer | Explore codebase for leaks and bugs | completed | a326e183-c8d1-40df-8c31-f0c19168ba2f |
-| worker_hardening | teamwork_preview_worker | Implement daemon and dashboard hardening | in-progress | d3015b44-60e5-4309-b47d-297ce329be5a |
+| worker_hardening | teamwork_preview_worker | Implement daemon and dashboard hardening | completed | d3015b44-60e5-4309-b47d-297ce329be5a |
+| reviewer_1 | teamwork_preview_reviewer | Review changes and E2E tests | in-progress | a9a6b8b6-9aac-4527-9c28-a8c4b157f429 |
+| reviewer_2 | teamwork_preview_reviewer | Review changes and E2E tests | in-progress | 9991b739-10a0-4fd2-918d-3fa1fe093a56 |
+| challenger_1 | teamwork_preview_challenger | Verify correctness and process leaks | in-progress | 37045c07-cdb3-4559-ba3f-0596f97c8a1c |
+| challenger_2 | teamwork_preview_challenger | Verify correctness and process leaks | in-progress | 0f1edae9-9a60-42a9-8ba7-d91a67c5ef0a |
+| forensic_auditor | teamwork_preview_auditor | Forensic integrity checks | in-progress | 0a583185-e057-4f37-965f-9fb9c056367b |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 2 / 16
-- Pending subagents: d3015b44-60e5-4309-b47d-297ce329be5a
+- Spawn count: 7 / 16
+- Pending subagents: a9a6b8b6-9aac-4527-9c28-a8c4b157f429, 9991b739-10a0-4fd2-918d-3fa1fe093a56, 37045c07-cdb3-4559-ba3f-0596f97c8a1c, 0f1edae9-9a60-42a9-8ba7-d91a67c5ef0a, 0a583185-e057-4f37-965f-9fb9c056367b
 - Predecessor: 6c663324-d0d1-459e-855b-2752b4ad7a52
 - Successor: not yet spawned
 

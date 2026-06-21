@@ -2,6 +2,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
+const { registerChildProcess } = require('./child-process-registry');
 
 function getErrorMessage(err) {
   if (!err) return 'Unknown error';
@@ -201,13 +202,14 @@ function runGit(repoPath, args) {
       });
     }
 
-    execFile('git', gitArgs, options, (error, stdout, stderr) => {
+    const child = execFile('git', gitArgs, options, (error, stdout, stderr) => {
       if (error) {
         reject({ error, stdout, stderr });
       } else {
         resolve({ stdout, stderr });
       }
     });
+    registerChildProcess(child);
   });
 }
 
