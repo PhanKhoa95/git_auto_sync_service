@@ -3,6 +3,12 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
+const lastSyncTimes = new Map(); // repoPath -> ISOString
+
+function getLastSyncTime(repoPath) {
+  return lastSyncTimes.get(repoPath) || null;
+}
+
 /**
  * Reads branch name directly from .git/HEAD to avoid process spawning.
  */
@@ -314,6 +320,7 @@ async function performSync(repoPath) {
 
     if (!statusOutput) {
       logger.info(`[${repoName}] Working tree clean. No local modifications to sync.`);
+      lastSyncTimes.set(repoPath, new Date().toISOString());
       return;
     }
 
@@ -391,6 +398,7 @@ async function performSync(repoPath) {
     }
 
     logger.info(`[${repoName}] Synchronization cycle completed successfully.`);
+    lastSyncTimes.set(repoPath, new Date().toISOString());
   } catch (err) {
     logger.error(`[${repoName}] Unexpected error during sync: ${err.message || err}`);
   }
@@ -399,6 +407,7 @@ async function performSync(repoPath) {
 module.exports = {
   syncRepository,
   runGit,
-  getRemoteOriginUrl
+  getRemoteOriginUrl,
+  getLastSyncTime
 };
 

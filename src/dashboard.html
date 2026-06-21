@@ -732,14 +732,15 @@
         <table class="repo-table" id="repoTable">
           <thead>
             <tr>
-              <th width="35%">Repository</th>
-              <th width="45%">Remote origin</th>
+              <th width="30%">Repository</th>
+              <th width="35%">Remote origin</th>
+              <th width="15%">Last Synced</th>
               <th width="20%" style="text-align: right;">Actions</th>
             </tr>
           </thead>
           <tbody id="repoTableBody">
             <tr>
-              <td colspan="3">
+              <td colspan="4">
                 <div class="empty-state">
                   <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm-9 9H7v-2h3v2zm7 0h-5v-2h5v2zm2-7H5V10h14v2z"/></svg>
                   <p>Scanning for repositories on drive E:\...</p>
@@ -1108,7 +1109,7 @@
       if (repoPaths.length === 0) {
         repoTableBody.innerHTML = `
           <tr>
-            <td colspan="3">
+            <td colspan="4">
               <div class="empty-state">
                 <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm-9 9H7v-2h3v2zm7 0h-5v-2h5v2zm2-7H5V10h14v2z"/></svg>
                 <p>No active Git repositories detected under monitored roots</p>
@@ -1152,7 +1153,7 @@
         // Render Group Header
         html += `
           <tr style="background: rgba(255, 255, 255, 0.015);">
-            <td colspan="3" style="padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+            <td colspan="4" style="padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
               <div class="root-group-header" style="margin: 0.3rem 0;">
                 <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z"/></svg>
                 Monitored Directory: ${root}
@@ -1186,6 +1187,20 @@
                 Git Online
                </button>`;
 
+          let lastSyncFormatted = '<span style="color: var(--text-muted); font-style: italic;">Never</span>';
+          if (repo.lastSyncTime) {
+            const date = new Date(repo.lastSyncTime);
+            const now = new Date();
+            const isToday = date.toDateString() === now.toDateString();
+            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            if (isToday) {
+              lastSyncFormatted = `<span style="font-family: 'Fira Code', monospace; color: var(--success-color); font-weight: 500;" title="${date.toLocaleString()}">${timeStr}</span>`;
+            } else {
+              const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+              lastSyncFormatted = `<span style="font-family: 'Fira Code', monospace; color: var(--success-color); font-weight: 500;" title="${date.toLocaleString()}">${dateStr} ${timeStr}</span>`;
+            }
+          }
+
           html += `
             <tr>
               <td>
@@ -1209,6 +1224,9 @@
                     </svg>
                   </button>
                 </div>
+              </td>
+              <td>
+                ${lastSyncFormatted}
               </td>
               <td style="text-align: right;">
                 <div style="display: inline-flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">

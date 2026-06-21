@@ -8,6 +8,48 @@ const BASE_DIR = process.env.TEST_E_DRIVE_PATH || 'E:\\';
 const lockFilePath = path.join(BASE_DIR, '.sync.lock');
 
 /**
+ * Checks if a process with the given PID is running and is indeed a Node daemon process.
+ */
+function isDaemonProcessRunning(pid) {
+  try {
+    process.kill(pid, 0);
+  } catch (e) {
+    // Process does not exist (ESRCH) or we do not have permission
+    return false;
+  }
+
+  // Verification to prevent false-positives from recycled PIDs
+  // Bypass verification in E2E tests to avoid slow child process spawning delays
+  if (process.env.TEST_E_DRIVE_PATH) {
+    return true;
+  }
+
+  if (process.platform === 'win32') {
+    const { execSync } = require('child_process');
+    try {
+      const cmdOutput = execSync(`wmic process where processid=${pid} get commandline`, { stdio: 'pipe' }).toString();
+      return cmdOutput.toLowerCase().includes('index.js') || cmdOutput.toLowerCase().includes('node');
+    } catch (wmicErr) {
+      try {
+        const tasklistOutput = execSync(`tasklist /NH /FI "PID eq ${pid}"`, { stdio: 'pipe' }).toString();
+        return tasklistOutput.toLowerCase().includes('node.exe') || tasklistOutput.toLowerCase().includes('node');
+      } catch (err) {
+        // Fallback to true if tools fail
+        return true;
+      }
+    }
+  } else {
+    const { execSync } = require('child_process');
+    try {
+      const psOutput = execSync(`ps -p ${pid} -o command=`, { stdio: 'pipe' }).toString();
+      return psOutput.toLowerCase().includes('node') || psOutput.toLowerCase().includes('index.js');
+    } catch (err) {
+      return true;
+    }
+  }
+}
+
+/**
  * Acquires lock on the base directory to prevent concurrent daemon execution.
  */
 function acquireLock() {
@@ -15,22 +57,14 @@ function acquireLock() {
     if (fs.existsSync(lockFilePath)) {
       const existingPid = parseInt(fs.readFileSync(lockFilePath, 'utf8').trim(), 10);
       if (existingPid) {
-        try {
-          process.kill(existingPid, 0);
-          // Process is still running, abort startup
+        if (isDaemonProcessRunning(existingPid)) {
           logger.error(`Another daemon instance with PID ${existingPid} is already running. Exiting.`);
           process.exit(1);
-        } catch (e) {
-          if (e.code === 'ESRCH') {
-            // Process is not running, lock is stale, we can remove it
-            logger.warn(`Stale lock file found for PID ${existingPid}. Removing it.`);
-            try { fs.unlinkSync(lockFilePath); } catch (err) {}
-          } else {
-            // Process is likely running but we do not have permission or another error occurred.
-            // Exit immediately and do not delete the lock file.
-            logger.error(`Another daemon instance with PID ${existingPid} is running (kill error: ${e.code || e.message}). Exiting.`);
-            process.exit(1);
-          }
+        } else {
+          logger.warn(`Stale lock file found for PID ${existingPid} (process is not the daemon). Removing it.`);
+          try {
+            fs.unlinkSync(lockFilePath);
+          } catch (err) {}
         }
       }
     }

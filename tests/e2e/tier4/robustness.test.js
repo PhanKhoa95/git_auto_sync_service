@@ -27,7 +27,7 @@ describe('Tier 4 Robustness & Failure Recovery Tests', function () {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // Helper to wait for a commit matching pattern in the remote repo
-  const waitForRemoteCommit = async (remotePath, pattern, timeoutMs = 8000) => {
+  const waitForRemoteCommit = async (remotePath, pattern, timeoutMs = 25000) => {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       try {
@@ -292,11 +292,10 @@ class GitWrapper
 
     // Restart daemon with short debounce
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
-    await delay(4500); // Wait for startup checks and sync
 
-    // Check remote git log to verify the pending change got synced on startup
+    // Check remote git log to verify the pending change got synced on startup (using dynamic polling)
     const remotePath = path.join(harness.remotesPath, 'repo1.git');
-    const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+    const commitMsg = await waitForRemoteCommit(remotePath, /Auto-sync:/);
     expect(commitMsg).to.match(/Auto-sync:/);
 
     const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;

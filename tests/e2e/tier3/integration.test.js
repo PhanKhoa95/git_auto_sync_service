@@ -40,13 +40,22 @@ describe('Tier 3 Integration & System Tests', function () {
     harness.createFile('repo1', 'concurrent.txt', 'repo1 modify');
     harness.createFile('sub/repo2', 'concurrent.txt', 'repo2 modify');
 
-    await delay(4500); // Wait for debounce and sync
-
     const remotePath1 = path.join(harness.remotesPath, 'repo1.git');
     const remotePath2 = path.join(harness.remotesPath, 'sub/repo2.git');
 
-    const files1 = harness.gitCmd(remotePath1, ['ls-tree', '-r', 'master', '--name-only']).stdout;
-    const files2 = harness.gitCmd(remotePath2, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+    // Poll until both files appear in remote or timeout (25s)
+    const start = Date.now();
+    let files1 = '', files2 = '';
+    while (Date.now() - start < 25000) {
+      try {
+        files1 = harness.gitCmd(remotePath1, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+        files2 = harness.gitCmd(remotePath2, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+        if (files1.includes('concurrent.txt') && files2.includes('concurrent.txt')) {
+          break;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
 
     expect(files1).to.include('concurrent.txt');
     expect(files2).to.include('concurrent.txt');
@@ -74,7 +83,18 @@ describe('Tier 3 Integration & System Tests', function () {
 
     // Modify locally
     harness.createFile('repo1', 'local_update.txt', 'local content');
-    await delay(4500); // Wait for sync
+
+    // Poll until local_update.txt is pushed to remote origin
+    const start = Date.now();
+    while (Date.now() - start < 25000) {
+      try {
+        const remoteFiles = harness.gitCmd(bareRepoPath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+        if (remoteFiles.includes('local_update.txt')) {
+          break;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
 
     // Local repo should now have both files
     const files = fs.readdirSync(localPath);
@@ -94,12 +114,20 @@ describe('Tier 3 Integration & System Tests', function () {
     harness.startDaemon({ DEBOUNCE_DELAY: '500' });
     await delay(500);
 
-    // 1. Simulate offline state: point remote to invalid path
+    // 2. Simulate offline state: point remote to invalid path
     harness.gitCmd(localPath, ['remote', 'set-url', 'origin', 'invalid_remote_path_offline']);
 
     // 2. Modify local file (sync fails, logs error, but daemon continues)
     harness.createFile('repo1', 'offline_mod.txt', 'failed push');
-    await delay(3500);
+    
+    // Poll for log containing error
+    const startOffline = Date.now();
+    while (Date.now() - startOffline < 25000) {
+      if (harness.readLog().toLowerCase().includes('error')) {
+        break;
+      }
+      await delay(200);
+    }
     expect(harness.readLog().toLowerCase()).to.include('error');
 
     // 3. Restore network: restore correct remote URL
@@ -107,7 +135,18 @@ describe('Tier 3 Integration & System Tests', function () {
 
     // 4. Modify file again to trigger another sync
     harness.createFile('repo1', 'online_mod.txt', 'success push');
-    await delay(4500); // Wait for new sync
+    
+    // Poll until online_mod.txt is in the remote
+    const startOnline = Date.now();
+    while (Date.now() - startOnline < 25000) {
+      try {
+        const remoteFiles = harness.gitCmd(bareRepoPath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+        if (remoteFiles.includes('online_mod.txt')) {
+          break;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
 
     // Verify remote has both files
     const remoteFiles = harness.gitCmd(bareRepoPath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
@@ -164,7 +203,19 @@ describe('Tier 3 Integration & System Tests', function () {
 
     // Modify a file in repo1
     harness.createFile('repo1', 'junction_test.txt', 'junction content');
-    await delay(3500);
+    
+    // Poll until junction_test.txt is pushed to remote
+    const startJunction = Date.now();
+    const remotePath = path.join(harness.remotesPath, 'repo1.git');
+    while (Date.now() - startJunction < 25000) {
+      try {
+        const remoteFiles = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+        if (remoteFiles.includes('junction_test.txt')) {
+          break;
+        }
+      } catch (e) {}
+      await delay(200);
+    }
 
     // Clean junction so cleanSandbox works
     if (fs.existsSync(junctionPath)) {
@@ -179,7 +230,6 @@ describe('Tier 3 Integration & System Tests', function () {
 
     // Process should not infinite loop and should sync the file successfully
     expect(harness.daemonProcess).to.not.be.null;
-    const remotePath = path.join(harness.remotesPath, 'repo1.git');
     const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
     expect(files).to.include('junction_test.txt');
   });

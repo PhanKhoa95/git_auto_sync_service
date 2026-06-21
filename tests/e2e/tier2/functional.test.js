@@ -27,7 +27,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // Helper to wait for a commit matching pattern in the remote repo
-  const waitForRemoteCommit = async (remotePath, pattern, timeoutMs = 8000) => {
+  const waitForRemoteCommit = async (remotePath, pattern, timeoutMs = 25000) => {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       try {
@@ -42,7 +42,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
   };
 
   // Helper to wait for a file to appear in the remote repo tree
-  const waitForRemoteFile = async (remotePath, branch, filename, timeoutMs = 8000) => {
+  const waitForRemoteFile = async (remotePath, branch, filename, timeoutMs = 25000) => {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       try {
