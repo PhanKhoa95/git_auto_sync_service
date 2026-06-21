@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const logger = require('./logger');
 const { watchRepositories, stopWatching } = require('./repo-watcher');
+
 
 // Base directory configurable via env, defaulting to 'E:\'
 const BASE_DIR = process.env.TEST_E_DRIVE_PATH || 'E:\\';
@@ -153,7 +155,7 @@ process.on('uncaughtException', (error) => {
 // ==================================================
 // Lightweight HTTP Server for Web Dashboard
 // ==================================================
-const http = require('http');
+
 
 function startServer(port) {
   const server = http.createServer((req, res) => {
