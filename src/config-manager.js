@@ -14,23 +14,31 @@ let currentConfig = null;
 
 function loadConfig() {
   try {
+    const envDebounce = process.env.DEBOUNCE_DELAY ? parseInt(process.env.DEBOUNCE_DELAY, 10) : null;
     if (fs.existsSync(CONFIG_FILE)) {
       const data = fs.readFileSync(CONFIG_FILE, 'utf8');
       const parsed = JSON.parse(data);
       
       // Ensure all fields are present, otherwise merge with defaults
       currentConfig = {
-        debounceDelayMs: typeof parsed.debounceDelayMs === 'number' ? parsed.debounceDelayMs : DEFAULT_CONFIG.debounceDelayMs,
+        debounceDelayMs: envDebounce !== null && !isNaN(envDebounce) ? envDebounce : (typeof parsed.debounceDelayMs === 'number' ? parsed.debounceDelayMs : DEFAULT_CONFIG.debounceDelayMs),
         monitoredRoots: Array.isArray(parsed.monitoredRoots) ? parsed.monitoredRoots : DEFAULT_CONFIG.monitoredRoots,
         ignoredPatterns: Array.isArray(parsed.ignoredPatterns) ? parsed.ignoredPatterns : DEFAULT_CONFIG.ignoredPatterns
       };
     } else {
-      currentConfig = { ...DEFAULT_CONFIG };
+      currentConfig = {
+        ...DEFAULT_CONFIG,
+        debounceDelayMs: envDebounce !== null && !isNaN(envDebounce) ? envDebounce : DEFAULT_CONFIG.debounceDelayMs
+      };
       saveConfig(currentConfig);
     }
   } catch (err) {
     logger.warn(`Failed to read config.json, using defaults: ${err.message}`);
-    currentConfig = { ...DEFAULT_CONFIG };
+    const envDebounce = process.env.DEBOUNCE_DELAY ? parseInt(process.env.DEBOUNCE_DELAY, 10) : null;
+    currentConfig = {
+      ...DEFAULT_CONFIG,
+      debounceDelayMs: envDebounce !== null && !isNaN(envDebounce) ? envDebounce : DEFAULT_CONFIG.debounceDelayMs
+    };
   }
   return currentConfig;
 }
