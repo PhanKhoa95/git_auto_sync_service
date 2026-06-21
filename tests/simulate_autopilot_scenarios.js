@@ -24,14 +24,46 @@ async function run() {
   function createRepo(name) {
     const repoPath = path.join(BASE_DIR, name);
     if (fs.existsSync(repoPath)) {
-      fs.rmSync(repoPath, { recursive: true, force: true });
+      log(`Repo folder exists: ${name}. Cleaning contents instead of deleting to avoid Windows lock issues...`);
+      try {
+        // Unset read-only attribute if any
+        execSync(`attrib -r "${repoPath}\\*.*" /s /d`, { stdio: 'ignore' });
+      } catch(e){}
+      
+      // Clean git repo
+      try {
+        runGit(repoPath, ['clean', '-fdx']);
+        runGit(repoPath, ['reset', '--hard']);
+      } catch (e) {
+        log(`Git clean failed for ${name}, trying manual file removal...`);
+        try {
+          const items = fs.readdirSync(repoPath);
+          for (const item of items) {
+            if (item === '.git') continue;
+            fs.rmSync(path.join(repoPath, item), { recursive: true, force: true });
+          }
+        } catch (err) {
+          log(`Manual clean failed: ${err.message}`);
+        }
+      }
+    } else {
+      fs.mkdirSync(repoPath, { recursive: true });
+      runGit(repoPath, ['init']);
+      runGit(repoPath, ['checkout', '-b', 'main']);
     }
-    fs.mkdirSync(repoPath, { recursive: true });
-    runGit(repoPath, ['init']);
-    runGit(repoPath, ['checkout', '-b', 'main']);
+    
+    // Ensure HEAD is pointing to main and clean state
+    try {
+      runGit(repoPath, ['checkout', 'main']);
+    } catch(e) {
+      try { runGit(repoPath, ['checkout', '-b', 'main']); } catch(err){}
+    }
+
     fs.writeFileSync(path.join(repoPath, 'README.md'), `# ${name}\n`);
     runGit(repoPath, ['add', '.']);
-    runGit(repoPath, ['commit', '-m', 'Initial commit']);
+    try {
+      runGit(repoPath, ['commit', '-m', 'Initial commit']);
+    } catch(e) {}
     repos.push(repoPath);
     return repoPath;
   }
@@ -39,12 +71,32 @@ async function run() {
   function setupRemote(localPath, name) {
     const remotePath = path.join(BASE_DIR, 'temp_remotes', name + '.git');
     if (fs.existsSync(remotePath)) {
-      fs.rmSync(remotePath, { recursive: true, force: true });
+      try {
+        fs.rmSync(remotePath, { recursive: true, force: true });
+      } catch(e) {
+        log(`Failed to delete remote ${name}, trying to clean git directory...`);
+      }
     }
-    fs.mkdirSync(remotePath, { recursive: true });
-    execSync(`git init --bare`, { cwd: remotePath });
-    runGit(localPath, ['remote', 'add', 'origin', remotePath]);
-    runGit(localPath, ['push', '-u', 'origin', 'main']);
+    if (!fs.existsSync(remotePath)) {
+      fs.mkdirSync(remotePath, { recursive: true });
+      execSync(`git init --bare`, { cwd: remotePath });
+    }
+    
+    // Check if remote 'origin' already exists
+    let hasRemote = false;
+    try {
+      runGit(localPath, ['remote', 'get-url', 'origin']);
+      hasRemote = true;
+    } catch(e) {}
+
+    if (hasRemote) {
+      runGit(localPath, ['remote', 'set-url', 'origin', remotePath]);
+    } else {
+      runGit(localPath, ['remote', 'add', 'origin', remotePath]);
+    }
+    
+    // Force push to remote
+    runGit(localPath, ['push', '-f', '-u', 'origin', 'main']);
     return remotePath;
   }
 
@@ -92,7 +144,7 @@ async function run() {
     // Create remote commit on another cloned repo
     const r4Clone = path.join(BASE_DIR, 'temp_remotes', 'sync_fail_4_merge_conflict_clone');
     if (fs.existsSync(r4Clone)) fs.rmSync(r4Clone, { recursive: true, force: true });
-    execSync(`git clone ${rem4} ${r4Clone}`);
+    execSync(`git clone "${rem4}" "${r4Clone}"`);
     runGit(r4Clone, ['config', 'user.name', 'Tester']);
     runGit(r4Clone, ['config', 'user.email', 'tester@e2e.local']);
     fs.writeFileSync(path.join(r4Clone, 'conflict.txt'), 'Remote Content\n');
@@ -101,7 +153,6 @@ async function run() {
     runGit(r4Clone, ['push', 'origin', 'main']);
     // Create local conflicting change
     fs.writeFileSync(path.join(r4, 'conflict.txt'), 'Local Content\n');
-    // Wait for file changes to trigger sync
 
     // 5. Non-Fast-Forward Push
     log('Setting up Scenario 5: Non-Fast-Forward Push...');
@@ -110,7 +161,7 @@ async function run() {
     // Make remote move ahead
     const r5Clone = path.join(BASE_DIR, 'temp_remotes', 'sync_fail_5_non_ff_clone');
     if (fs.existsSync(r5Clone)) fs.rmSync(r5Clone, { recursive: true, force: true });
-    execSync(`git clone ${rem5} ${r5Clone}`);
+    execSync(`git clone "${rem5}" "${r5Clone}"`);
     runGit(r5Clone, ['config', 'user.name', 'Tester']);
     runGit(r5Clone, ['config', 'user.email', 'tester@e2e.local']);
     fs.writeFileSync(path.join(r5Clone, 'ff.txt'), 'Remote Content 2\n');
@@ -141,23 +192,37 @@ async function run() {
     fs.writeFileSync(path.join(r6Temp, 'unrelated.txt'), 'Unrelated root\n');
     execSync(`git add .`, { cwd: r6Temp });
     execSync(`git commit -m "Unrelated root commit"`, { cwd: r6Temp });
-    execSync(`git remote add origin ${rem6}`, { cwd: r6Temp });
+    execSync(`git remote add origin "${rem6}"`, { cwd: r6Temp });
     execSync(`git push -u origin main`, { cwd: r6Temp });
     // Connect original local repo to the remote
-    runGit(r6, ['remote', 'add', 'origin', rem6]);
+    let hasRemoteR6 = false;
+    try { runGit(r6, ['remote', 'get-url', 'origin']); hasRemoteR6 = true; } catch(e){}
+    if (hasRemoteR6) {
+      runGit(r6, ['remote', 'set-url', 'origin', rem6]);
+    } else {
+      runGit(r6, ['remote', 'add', 'origin', rem6]);
+    }
     // Modify file
     fs.appendFileSync(path.join(r6, 'README.md'), 'Mod 6\n');
 
     // 7. No Remote configured
     log('Setting up Scenario 7: No Remote...');
     const r7 = createRepo('sync_fail_7_no_remote');
-    // Just modify file (no setupRemote)
+    // Unlink remote origin if any
+    try { runGit(r7, ['remote', 'remove', 'origin']); } catch(e){}
+    // Just modify file
     fs.appendFileSync(path.join(r7, 'README.md'), 'Mod 7\n');
 
     // 8. Network Unreachable (Invalid Remote URL)
     log('Setting up Scenario 8: Network Unreachable...');
     const r8 = createRepo('sync_fail_8_network_unreachable');
-    runGit(r8, ['remote', 'add', 'origin', 'https://invalid-host-name-for-testing.com/repo.git']);
+    let hasRemoteR8 = false;
+    try { runGit(r8, ['remote', 'get-url', 'origin']); hasRemoteR8 = true; } catch(e){}
+    if (hasRemoteR8) {
+      runGit(r8, ['remote', 'set-url', 'origin', 'https://invalid-host-name-for-testing.com/repo.git']);
+    } else {
+      runGit(r8, ['remote', 'add', 'origin', 'https://invalid-host-name-for-testing.com/repo.git']);
+    }
     // Modify file
     fs.appendFileSync(path.join(r8, 'README.md'), 'Mod 8\n');
 
@@ -174,14 +239,17 @@ async function run() {
     const r10 = createRepo('sync_fail_10_circular_symlink');
     setupRemote(r10, 'sync_fail_10_circular_symlink');
     // Create symlink pointing to parent or another directory
-    try {
-      fs.symlinkSync(r10, path.join(r10, 'circular_link'), 'junction');
-    } catch(e) {
-      log('Symlink creation bypassed/failed (permissions). Trying junction via cmd...');
+    const linkPath = path.join(r10, 'circular_junction');
+    if (!fs.existsSync(linkPath)) {
       try {
-        execSync(`mklink /j "${path.join(r10, 'circular_junction')}" "${r10}"`);
-      } catch(cmdErr) {
-        log('Junction bypassed/failed.');
+        fs.symlinkSync(r10, linkPath, 'junction');
+      } catch(e) {
+        log('Symlink creation bypassed/failed (permissions). Trying junction via cmd...');
+        try {
+          execSync(`mklink /j "${linkPath}" "${r10}"`);
+        } catch(cmdErr) {
+          log('Junction bypassed/failed.');
+        }
       }
     }
     // Modify file
