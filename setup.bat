@@ -1,14 +1,4 @@
 @echo off
-:: Check for Administrator privileges
-net session >nul 2>&1
-if %errorLevel% == 0 (
-    echo [INFO] Running with Administrator privileges...
-) else (
-    echo [INFO] Requesting Administrator privileges...
-    powershell -Command "Start-Process -FilePath '%0' -Verb RunAs"
-    exit /b
-)
-
 :: Get the directory where this script is located
 cd /d "%~dp0"
 
