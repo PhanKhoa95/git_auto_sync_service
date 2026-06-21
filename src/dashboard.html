@@ -294,6 +294,17 @@
       transform: translateY(-1px);
     }
 
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #e5e7eb;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
     .btn-danger {
       background: rgba(255, 23, 68, 0.15);
       color: var(--error-color);
@@ -541,11 +552,6 @@
       font-size: 0.75rem;
       border-top: 1px solid rgba(255, 255, 255, 0.02);
       margin-top: auto;
-    }
-
-    footer a {
-      color: var(--accent-color);
-      text-decoration: none;
     }
 
     /* Modal styles */
@@ -942,6 +948,7 @@
     let pollInterval = null;
     let lastLogHash = '';
     let activeConfig = null;
+    let lastLogSize = -1;
 
     // Element bindings
     const headerStatusDot = document.getElementById('headerStatusDot');
@@ -1050,7 +1057,10 @@
         setConnectionState(true);
         updateStatusStats(data);
         updateRepoTable(data.watchedRepositories);
-        fetchLogs();
+        if (data.logSize !== lastLogSize) {
+          lastLogSize = data.logSize;
+          fetchLogs();
+        }
       } catch (err) {
         setConnectionState(false);
       }
