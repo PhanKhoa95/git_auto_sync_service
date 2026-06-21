@@ -19,7 +19,7 @@ if %errorLevel% neq 0 (
 :: Check if the remote origin is an online URL and perform initial push to cache credentials
 echo.
 echo [INFO] Checking if remote needs online authentication...
-git remote get-url origin 2>nul | findstr /i "http:// git@ ssh://" >nul
+git remote get-url origin 2>nul | findstr /i "http git@ ssh" >nul
 if %errorLevel% == 0 (
     echo [INFO] Online remote detected. Performing initial push to cache credentials...
     echo [IMPORTANT] A browser login window may pop up. Please authenticate to complete setup.
