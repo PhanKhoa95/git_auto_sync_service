@@ -78,31 +78,39 @@ function triggerSync(repoPath) {
 /**
  * Scans a single root directory and its level-1 children for Git repositories.
  */
-function findGitRepositoriesForRoot(baseDir) {
+const fsPromises = fs.promises;
+
+async function isGitRepo(dir) {
+  try {
+    const gitDir = path.join(dir, '.git');
+    const stat = await fsPromises.stat(gitDir);
+    return stat.isDirectory();
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Scans a single root directory and its level-1 children for Git repositories asynchronously.
+ */
+async function findGitRepositoriesForRoot(baseDir) {
   const repos = [];
 
   try {
-    if (!fs.existsSync(baseDir)) {
+    try {
+      await fsPromises.access(baseDir);
+    } catch (e) {
       logger.warn(`Base directory does not exist: ${baseDir}`);
       return repos;
     }
 
-    const isGitRepo = (dir) => {
-      try {
-        const gitDir = path.join(dir, '.git');
-        return fs.existsSync(gitDir) && fs.statSync(gitDir).isDirectory();
-      } catch (e) {
-        return false;
-      }
-    };
-
-    if (isGitRepo(baseDir)) {
+    if (await isGitRepo(baseDir)) {
       repos.push(baseDir);
     }
 
     let level1Items;
     try {
-      level1Items = fs.readdirSync(baseDir);
+      level1Items = await fsPromises.readdir(baseDir);
     } catch (err) {
       logger.error(`Error listing base directory ${baseDir}: ${err.message}`);
       return repos;
@@ -118,18 +126,18 @@ function findGitRepositoriesForRoot(baseDir) {
 
       let stat;
       try {
-        stat = fs.statSync(fullPath);
+        stat = await fsPromises.stat(fullPath);
       } catch (err) {
         continue; // skip unreadable
       }
 
       if (stat.isDirectory()) {
-        if (isGitRepo(fullPath)) {
+        if (await isGitRepo(fullPath)) {
           repos.push(fullPath);
         } else {
           let level2Items;
           try {
-            level2Items = fs.readdirSync(fullPath);
+            level2Items = await fsPromises.readdir(fullPath);
           } catch (err) {
             continue; // skip unreadable level-1 subdirectory
           }
@@ -141,7 +149,7 @@ function findGitRepositoriesForRoot(baseDir) {
               continue;
             }
 
-            if (isGitRepo(subFullPath)) {
+            if (await isGitRepo(subFullPath)) {
               repos.push(subFullPath);
             }
           }
@@ -158,13 +166,14 @@ function findGitRepositoriesForRoot(baseDir) {
 /**
  * Scans all configured roots and returns unique Git repositories.
  */
-function findGitRepositories() {
+async function findGitRepositories() {
   const config = getConfig();
   const roots = config.monitoredRoots || ['E:\\'];
   const allRepos = [];
 
   for (const root of roots) {
-    allRepos.push(...findGitRepositoriesForRoot(root));
+    const repos = await findGitRepositoriesForRoot(root);
+    allRepos.push(...repos);
   }
 
   return [...new Set(allRepos)];
@@ -173,8 +182,8 @@ function findGitRepositories() {
 /**
  * Dynamic scan updates watchers to add new repos and stop watching removed ones.
  */
-function updateWatchers() {
-  const currentRepos = findGitRepositories();
+async function updateWatchers() {
+  const currentRepos = await findGitRepositories();
 
   // 1. Start watching new repositories
   for (const repoPath of currentRepos) {
@@ -262,13 +271,13 @@ function watchRepositories(baseDir) {
   lastScanTime = Date.now();
   
   // Perform initial scan and start watchers
-  updateWatchers();
+  updateWatchers().catch(err => logger.error(`Initial scan failed: ${err.message}`));
 
   // Start 30-second periodic scan interval
-  scanInterval = setInterval(() => {
+  scanInterval = setInterval(async () => {
     logger.info(`Running periodic 30-second repository scan under monitored roots...`);
     lastScanTime = Date.now();
-    updateWatchers();
+    await updateWatchers().catch(err => logger.error(`Periodic scan failed: ${err.message}`));
   }, 30000);
 
   return watchers;
@@ -308,7 +317,7 @@ function stopAllWatchersOnly() {
 function reloadWatcher() {
   logger.info('Reloading repository watchers dynamically...');
   stopAllWatchersOnly();
-  updateWatchers();
+  updateWatchers().catch(err => logger.error(`Reload scan failed: ${err.message}`));
 }
 
 function getWatchedRepositoriesMetadata() {
@@ -329,7 +338,7 @@ function getWatchedRepositoriesMetadata() {
 function forceGlobalScan() {
   logger.info(`Forcing repository scan under monitored roots...`);
   lastScanTime = Date.now();
-  updateWatchers();
+  updateWatchers().catch(err => logger.error(`Force scan failed: ${err.message}`));
 }
 
 module.exports = {
