@@ -41,13 +41,19 @@ function isDaemonProcessRunning(pid) {
   if (process.platform === 'win32') {
     const { execSync } = require('child_process');
     try {
-      const cmdOutput = execSync(`wmic process where processid=${pid} get commandline`, { stdio: 'pipe' }).toString();
-      return cmdOutput.toLowerCase().includes('index.js') || cmdOutput.toLowerCase().includes('node');
-    } catch (wmicErr) {
+      // 1. Try tasklist first (standard on all Windows, not deprecated)
+      const tasklistOutput = execSync(`tasklist /NH /FI "PID eq ${pid}"`, { stdio: 'pipe' }).toString();
+      const lowerOutput = tasklistOutput.toLowerCase();
+      if (lowerOutput.includes('node.exe') || lowerOutput.includes('node')) {
+        return true;
+      }
+      return false;
+    } catch (tasklistErr) {
       try {
-        const tasklistOutput = execSync(`tasklist /NH /FI "PID eq ${pid}"`, { stdio: 'pipe' }).toString();
-        return tasklistOutput.toLowerCase().includes('node.exe') || tasklistOutput.toLowerCase().includes('node');
-      } catch (err) {
+        // 2. Fallback to wmic if tasklist fails
+        const cmdOutput = execSync(`wmic process where processid=${pid} get commandline`, { stdio: 'pipe' }).toString();
+        return cmdOutput.toLowerCase().includes('index.js') || cmdOutput.toLowerCase().includes('node');
+      } catch (wmicErr) {
         return true;
       }
     }
