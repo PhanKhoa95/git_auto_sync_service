@@ -87,6 +87,7 @@ if (isDaemonAlreadyRunning()) {
   process.exit(0);
 }
 
+let currentChild = null;
 let consecutiveCrashes = 0;
 let lastStart = 0;
 
@@ -105,8 +106,10 @@ function startDaemon() {
     env: childEnv,
     stdio: 'ignore' // run silent/detached
   });
+  currentChild = child;
 
   child.on('exit', (code, signal) => {
+    currentChild = null;
     const elapsed = Date.now() - lastStart;
     log(`Daemon exited with code ${code} (signal: ${signal}). Run time: ${Math.round(elapsed / 1000)}s.`);
 
@@ -135,6 +138,20 @@ function startDaemon() {
     setTimeout(startDaemon, delay);
   });
 }
+
+function handleShutdown(signal) {
+  log(`Watchdog received ${signal}. Shutting down gracefully...`);
+  if (currentChild && currentChild.exitCode === null && currentChild.signalCode === null) {
+    log(`Terminating child daemon (PID: ${currentChild.pid})...`);
+    try {
+      currentChild.kill('SIGTERM');
+    } catch (err) {}
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
 // Start the watchdog
 log('Watchdog service active.');

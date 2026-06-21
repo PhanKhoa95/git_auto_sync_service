@@ -7,23 +7,12 @@ const E2ETestHarness = require('./e2e/harness');
 function getMemoryUsage(pid) {
   try {
     const output = execSync(`tasklist /NH /FI "PID eq ${pid}" /FO csv`, { encoding: 'utf8' }).trim();
-    // Output format: "node.exe","12345","Console","1","45,212 K"
     const parts = output.split(',');
     if (parts.length >= 5) {
       const memStr = parts[4].replace(/"/g, '').replace(/ K/g, '').replace(/,/g, '').trim();
-      return parseInt(memStr, 10); // in KB
+      return parseInt(memStr, 10);
     }
   } catch (e) {}
-  
-  try {
-    const output = execSync(`wmic process where processid=${pid} get WorkingSetSize`, { encoding: 'utf8' }).trim();
-    const lines = output.split(/\r?\n/);
-    if (lines.length >= 2) {
-      const bytes = parseInt(lines[1].trim(), 10);
-      return Math.round(bytes / 1024); // in KB
-    }
-  } catch (e) {}
-
   return null;
 }
 
@@ -94,6 +83,12 @@ async function run() {
   const harness = new E2ETestHarness();
   harness.setupSandbox();
   
+  // Override gitCmd to disable automatic gc
+  const originalGitCmd = harness.gitCmd.bind(harness);
+  harness.gitCmd = (cwd, args) => {
+    return originalGitCmd(cwd, ['-c', 'gc.auto=0', ...args]);
+  };
+  
   const port = 19999;
   console.log(`Spawning daemon on virtual drive: ${harness.virtualDrivePath}`);
   harness.startDaemon({ PORT: port.toString(), DEBOUNCE_DELAY: '500', START_SERVER: 'true' });
@@ -108,92 +103,86 @@ async function run() {
   const iterations = 30;
   const memHistory = [initialMem];
   
-  for (let i = 1; i <= iterations; i++) {
-    const repoName = `stability_repo_${i}`;
-    console.log(`\n--- Iteration ${i} / ${iterations} ---`);
-    
-    // 1. Add repository
-    console.log(`Adding repository: ${repoName}`);
-    harness.createMockRepo(repoName, true);
-    
-    // Force scan
-    await postJson(`http://localhost:${port}/api/scan`);
-    
-    // Wait for daemon to detect repository
-    let detected = false;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      const status = await fetchJson(`http://localhost:${port}/api/status`);
-      const watched = Object.keys(status.watchedRepositories);
-      if (watched.some(p => p.endsWith(repoName))) {
-        detected = true;
-        break;
-      }
-      await delay(200);
-    }
-    if (!detected) {
-      throw new Error(`Daemon failed to detect repo ${repoName}`);
-    }
-    console.log(`Daemon successfully detected and watched: ${repoName}`);
-    
-    // 2. Modify repository to trigger sync
-    console.log(`Triggering file system modification in ${repoName}`);
-    harness.createFile(repoName, `file_${i}.txt`, `stability test iteration ${i}`);
-    
-    // Wait for the sync to run and complete
-    const remotePath = path.join(harness.remotesPath, `${repoName}.git`);
-    let synced = false;
-    for (let attempt = 0; attempt < 50; attempt++) {
-      try {
-        const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
-        if (commitMsg.includes('Auto-sync:')) {
-          synced = true;
+  try {
+    for (let i = 1; i <= iterations; i++) {
+      const repoName = `stability_repo_${i}`;
+      console.log(`\n--- Iteration ${i} / ${iterations} ---`);
+      
+      harness.createMockRepo(repoName, true);
+      await postJson(`http://localhost:${port}/api/scan`);
+      
+      let detected = false;
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const status = await fetchJson(`http://localhost:${port}/api/status`);
+        const watched = Object.keys(status.watchedRepositories);
+        if (watched.some(p => p.endsWith(repoName))) {
+          detected = true;
           break;
         }
-      } catch (e) {}
-      await delay(200);
-    }
-    if (!synced) {
-      throw new Error(`Sync failed or timed out for ${repoName}`);
-    }
-    console.log(`Sync completed successfully for ${repoName}`);
-    
-    // 3. Remove repository
-    console.log(`Removing repository: ${repoName}`);
-    harness.deleteRepo(repoName);
-    
-    // Force scan
-    await postJson(`http://localhost:${port}/api/scan`);
-    
-    // Wait for daemon to detect removal and clean up watchers
-    let cleaned = false;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      const status = await fetchJson(`http://localhost:${port}/api/status`);
-      const watched = Object.keys(status.watchedRepositories);
-      if (!watched.some(p => p.endsWith(repoName))) {
-        cleaned = true;
-        break;
+        await delay(200);
       }
-      await delay(200);
+      if (!detected) throw new Error(`Daemon failed to detect repo ${repoName}`);
+      
+      harness.createFile(repoName, `file_${i}.txt`, `stability test iteration ${i}`);
+      
+      const remotePath = path.join(harness.remotesPath, `${repoName}.git`);
+      let synced = false;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        try {
+          const commitMsg = harness.gitCmd(remotePath, ['log', '-1', '--pretty=%B']).stdout.trim();
+          if (commitMsg.includes('Auto-sync:')) {
+            synced = true;
+            break;
+          }
+        } catch (e) {}
+        await delay(200);
+      }
+      if (!synced) throw new Error(`Sync failed or timed out for ${repoName}`);
+      
+      console.log(`Sync completed successfully for ${repoName}`);
+      
+      // Cleanly kill any leftover git processes before attempting to delete repository
+      try {
+        execSync('taskkill /F /IM git.exe', { stdio: 'ignore' });
+      } catch (e) {}
+      
+      harness.deleteRepo(repoName);
+      await postJson(`http://localhost:${port}/api/scan`);
+      
+      let cleaned = false;
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const status = await fetchJson(`http://localhost:${port}/api/status`);
+        const watched = Object.keys(status.watchedRepositories);
+        if (!watched.some(p => p.endsWith(repoName))) {
+          cleaned = true;
+          break;
+        }
+        await delay(200);
+      }
+      if (!cleaned) throw new Error(`Daemon failed to clean up watchers for ${repoName}`);
+      
+      const currentMem = getMemoryUsage(daemonPid);
+      memHistory.push(currentMem);
+      console.log(`Memory usage: ${currentMem} KB (Diff: ${currentMem - initialMem} KB)`);
+      
+      // Check if git.exe or node.exe processes are left orphaned
+      const runningGitPids = getRunningProcesses('git.exe');
+      const runningNodePids = getRunningProcesses('node.exe');
+      console.log(`Active git.exe PIDs: [${runningGitPids.join(', ')}]`);
+      console.log(`Active node.exe PIDs: [${runningNodePids.join(', ')}]`);
     }
-    if (!cleaned) {
-      throw new Error(`Daemon failed to clean up watchers for ${repoName}`);
-    }
-    console.log(`Daemon successfully stopped watching and cleaned up: ${repoName}`);
-    
-    const currentMem = getMemoryUsage(daemonPid);
-    memHistory.push(currentMem);
-    console.log(`Memory usage: ${currentMem} KB (Diff: ${currentMem - initialMem} KB)`);
-    
-    // Check if git.exe or node.exe processes are left orphaned
-    const runningGitPids = getRunningProcesses('git.exe');
-    const runningNodePids = getRunningProcesses('node.exe');
-    console.log(`Active git.exe PIDs: [${runningGitPids.join(', ')}]`);
-    console.log(`Active node.exe PIDs: [${runningNodePids.join(', ')}]`);
+  } catch (err) {
+    console.error('Test loop encountered error:', err.message);
+    console.log('--- DAEMON OUTPUT ---');
+    console.log(harness.daemonOutput);
+    console.log('--- SYNC LOG ---');
+    console.log(harness.readLog());
+    throw err;
+  } finally {
+    console.log('\n--- Final Teardown ---');
+    await harness.stopDaemon();
+    harness.cleanSandbox();
   }
-  
-  console.log('\n--- Final Teardown ---');
-  await harness.stopDaemon();
-  harness.cleanSandbox();
   
   console.log('Memory usage history:', memHistory);
   const finalMem = memHistory[memHistory.length - 1];
