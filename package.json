@@ -1,0 +1,29 @@
+{
+  "name": "git-auto-sync-service",
+  "version": "1.0.0",
+  "description": "Background Git Auto-Sync Service for Windows",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node tests/e2e/runner.js",
+    "test:tier1": "mocha \"tests/e2e/tier1/*.test.js\" --timeout 20000",
+    "test:tier2": "mocha \"tests/e2e/tier2/*.test.js\" --timeout 20000",
+    "test:tier3": "mocha \"tests/e2e/tier3/*.test.js\" --timeout 20000",
+    "test:tier4": "mocha \"tests/e2e/tier4/*.test.js\" --timeout 20000"
+  },
+  "keywords": [
+    "git",
+    "sync",
+    "auto-sync",
+    "watcher"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "chai": "^4.4.1",
+    "mocha": "^10.4.0"
+  }
+}

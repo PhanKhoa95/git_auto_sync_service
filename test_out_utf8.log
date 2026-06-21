@@ -1,0 +1,32 @@
+﻿Starting Git Auto-Sync Service E2E Test Suite...
+
+[0m[0m
+[0m  Tier 1 Sanity & Smoke Tests[0m
+  [31m  1) TC-T1-01: Detect file creation in root repo[0m
+--- DAEMON OUTPUT FOR FAILED TEST ---
+[2026-06-20 18:22:40] [INFO] ==================================================
+[2026-06-20 18:22:40] [INFO] Git Auto-Sync Service Daemon Starting
+[2026-06-20 18:22:40] [INFO] ==================================================
+[2026-06-20 18:22:40] [INFO] PID: 13964
+[2026-06-20 18:22:40] [INFO] Node version: v24.15.0
+[2026-06-20 18:22:40] [INFO] Operating System: win32 (x64)
+[2026-06-20 18:22:40] [INFO] Monitoring Root: C:\Users\pkhoa\AppData\Local\Temp\git-auto-sync-test-nlh53dpk\sandbox_e
+[2026-06-20 18:22:40] [INFO] ==================================================
+[2026-06-20 18:22:40] [INFO] Initializing repo watcher on: C:\Users\pkhoa\AppData\Local\Temp\git-auto-sync-test-nlh53dpk\sandbox_e
+[2026-06-20 18:22:40] [INFO] [repo1] Setting up recursive file watcher...
+[2026-06-20 18:22:41] [INFO] [repo1] Starting synchronization cycle...
+[2026-06-20 18:22:41] [INFO] [repo1] Pulling latest changes from origin master...
+[2026-06-20 18:22:41] [INFO] [repo1] Pull successful.
+[2026-06-20 18:22:41] [INFO] [repo1] Working tree clean. No local modifications to sync.
+[2026-06-20 18:22:42] [INFO] [repo1] File system change detected: "test1.txt" (event: rename)
+[2026-06-20 18:22:42] [INFO] [repo1] File system change detected: "test1.txt" (event: change)
+[2026-06-20 18:22:43] [INFO] [repo1] File system change detected: "init.txt" (event: rename)
+[2026-06-20 18:22:43] [INFO] [repo1] Starting synchronization cycle...
+[2026-06-20 18:22:43] [WARN] [repo1] Repository path does not exist. Skipping sync.
+
+--- SYNC.LOG FOR FAILED TEST ---
+[2026-06-20 18:22:43] [INFO] [repo1] File system change detected: "init.txt" (event: rename)
+[2026-06-20 18:22:43] [INFO] [repo1] Starting synchronization cycle...
+[2026-06-20 18:22:43] [WARN] [repo1] Repository path does not exist. Skipping sync.
+
+  [32m  ΓêÜ[0m[90m TC-T1-02: Detect file modification in root repo[0m[31m (7089ms)[0m

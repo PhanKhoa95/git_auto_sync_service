@@ -1,0 +1,20 @@
+{
+  "name": "git-auto-sync-service",
+  "version": "1.0.0",
+  "description": "Background Git Auto-Sync Service for Windows",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": [
+    "git",
+    "sync",
+    "auto-sync",
+    "watcher"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

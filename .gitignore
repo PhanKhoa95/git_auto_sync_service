@@ -1,0 +1,6 @@
+node_modules/
+temp_target/
+testdir/
+.sync.lock
+sync.log
+launcher_debug.log
