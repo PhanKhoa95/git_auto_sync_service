@@ -671,6 +671,12 @@
           </svg>
           Clone Repository
         </button>
+        <button class="btn btn-sm" id="btnOpenPublishModal" style="background: rgba(0, 230, 118, 0.08); border-color: rgba(0, 230, 118, 0.2); color: var(--success-color);">
+          <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
+            <path d="M5 4v2h14V4H5zm0 10h4v6h6v-6h4l-7-7-7 7z"/>
+          </svg>
+          Publish Project
+        </button>
         <button class="btn btn-sm" id="btnOpenSettings">
           <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
             <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38(1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38-1.03-.7-1.62-.94l-.36-2.54c.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.44-.17-.47-.41l-.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
@@ -876,6 +882,49 @@
     </div>
   </div>
 
+  <!-- Publish Modal -->
+  <div class="modal-overlay" id="publishModal">
+    <div class="modal-card" style="width: 600px; max-width: 95%;">
+      <h2 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        <svg style="width: 20px; height: 20px; fill: var(--success-color);" viewBox="0 0 24 24">
+          <path d="M5 4v2h14V4H5zm0 10h4v6h6v-6h4l-7-7-7 7z"/>
+        </svg>
+        Publish Local Project
+      </h2>
+      
+      <div class="form-group">
+        <label class="form-label">Local Project Directory Path</label>
+        <input type="text" id="publishLocalPath" class="form-input" placeholder="e.g. C:\Users\pkhoa\OneDrive\Documents\my-folder">
+        <span class="form-help">Absolute path to local folder containing your source code.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Git Online Repository URL</label>
+        <input type="text" id="publishRemoteUrl" class="form-input" placeholder="e.g. https://github.com/username/repo.git">
+        <span class="form-help">Link to your new empty repository on GitHub/GitLab.</span>
+      </div>
+
+      <!-- Warning info for GCM -->
+      <div style="background: rgba(0, 230, 118, 0.05); border: 1px solid rgba(0, 230, 118, 0.2); border-radius: 8px; padding: 0.8rem; font-size: 0.8rem; line-height: 1.4; color: var(--text-main);">
+        <strong style="color: var(--success-color);">Authentication & Init Notice:</strong> This action will initialize Git inside the selected folder, commit all current files as the initial version, and push them to your online repository. Make sure you check your desktop screen if a login popup appears.
+      </div>
+
+      <!-- Console for Streaming Progress -->
+      <div class="form-group" id="publishConsoleGroup" style="display: none;">
+        <label class="form-label">Publish Progress Logs</label>
+        <div class="terminal" id="publishConsole" style="height: 200px; font-size: 0.75rem; background: #020204;">
+          <div class="log-line" style="color: var(--text-muted);">Ready. Click Start Publish to begin...</div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 1rem; margin-top: 0.5rem; width: 100%;">
+        <button class="btn btn-secondary" id="btnCancelPublish" style="flex: 1; justify-content: center;">Close</button>
+        <button class="btn btn-primary" id="btnStartPublish" style="flex: 1; justify-content: center; background: var(--success-color); border: none; box-shadow: 0 0 10px rgba(0, 230, 118, 0.15);">Start Publish</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer>
     <p>&copy; 2026 Antigravity Auto-Sync Service. Active in background.</p>
@@ -925,6 +974,16 @@
     const cloneConsoleGroup = document.getElementById('cloneConsoleGroup');
     const cloneConsole = document.getElementById('cloneConsole');
 
+    // Publish Modal Elements
+    const btnOpenPublishModal = document.getElementById('btnOpenPublishModal');
+    const publishModal = document.getElementById('publishModal');
+    const btnCancelPublish = document.getElementById('btnCancelPublish');
+    const btnStartPublish = document.getElementById('btnStartPublish');
+    const publishLocalPath = document.getElementById('publishLocalPath');
+    const publishRemoteUrl = document.getElementById('publishRemoteUrl');
+    const publishConsoleGroup = document.getElementById('publishConsoleGroup');
+    const publishConsole = document.getElementById('publishConsole');
+
     // Initialize Page
     function init() {
       fetchData();
@@ -947,6 +1006,11 @@
         const url = cloneUrl.value.trim();
         cloneFolderName.value = parseGitRepoName(url);
       });
+
+      // Publish modal listeners
+      btnOpenPublishModal.addEventListener('click', openPublishModal);
+      btnCancelPublish.addEventListener('click', closePublishModal);
+      btnStartPublish.addEventListener('click', startProjectPublish);
     }
 
     // Set connection status
@@ -1589,6 +1653,147 @@
         cloneConsole.scrollTop = cloneConsole.scrollHeight;
       }
     }
+
+    // Publish Modal Logic
+    function openPublishModal() {
+      publishLocalPath.value = '';
+      publishRemoteUrl.value = '';
+      publishConsoleGroup.style.display = 'none';
+      publishConsole.innerHTML = '<div class="log-line" style="color: var(--text-muted);">Ready. Click Start Publish to begin...</div>';
+      btnCancelPublish.textContent = 'Close';
+
+      // Enable inputs/buttons
+      btnStartPublish.disabled = false;
+      btnCancelPublish.disabled = false;
+      publishLocalPath.disabled = false;
+      publishRemoteUrl.disabled = false;
+
+      publishModal.classList.add('show');
+    }
+
+    function closePublishModal() {
+      if (btnCancelPublish.disabled) return;
+      publishModal.classList.remove('show');
+    }
+
+    async function startProjectPublish() {
+      const localPathVal = publishLocalPath.value.trim();
+      const remoteUrlVal = publishRemoteUrl.value.trim();
+
+      if (!localPathVal) {
+        alert('Please enter the local project directory path.');
+        return;
+      }
+      if (!remoteUrlVal) {
+        alert('Please enter the Git online repository URL.');
+        return;
+      }
+
+      // Disable UI elements during execution
+      btnStartPublish.disabled = true;
+      btnCancelPublish.disabled = true;
+      publishLocalPath.disabled = true;
+      publishRemoteUrl.disabled = true;
+
+      // Show console and initialize it
+      publishConsoleGroup.style.display = 'block';
+      publishConsole.innerHTML = '<div class="log-line" style="color: var(--accent-color);">[INFO] Initializing connection to publish endpoint...</div>';
+
+      try {
+        const response = await fetch('/api/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ localPath: localPathVal, remoteUrl: remoteUrlVal })
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          let errMsg = text;
+          try {
+            const parsedErr = JSON.parse(text);
+            errMsg = parsedErr.message || text;
+          } catch (e) {}
+
+          const lineDiv = document.createElement('div');
+          lineDiv.className = 'log-line';
+          lineDiv.style.color = 'var(--error-color)';
+          lineDiv.textContent = `[ERROR] Failed to start publish: ${errMsg}`;
+          publishConsole.appendChild(lineDiv);
+
+          btnStartPublish.disabled = false;
+          btnCancelPublish.disabled = false;
+          publishLocalPath.disabled = false;
+          publishRemoteUrl.disabled = false;
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let done = false;
+        let buffer = '';
+
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            buffer += decoder.decode(value, { stream: !done });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            lines.forEach(line => {
+              const parts = line.split('\r');
+              const displayLine = parts[parts.length - 1];
+              if (displayLine.trim()) {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'log-line';
+                if (displayLine.includes('[ERROR]')) {
+                  lineDiv.style.color = 'var(--error-color)';
+                } else if (displayLine.includes('[SUCCESS]')) {
+                  lineDiv.style.color = 'var(--success-color)';
+                } else if (displayLine.includes('[INFO]')) {
+                  lineDiv.style.color = 'var(--accent-color)';
+                } else {
+                  lineDiv.style.color = 'var(--text-main)';
+                }
+                lineDiv.textContent = displayLine;
+                publishConsole.appendChild(lineDiv);
+              }
+            });
+            publishConsole.scrollTop = publishConsole.scrollHeight;
+          }
+        }
+
+        if (buffer.trim()) {
+          const parts = buffer.split('\r');
+          const displayLine = parts[parts.length - 1];
+          if (displayLine.trim()) {
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'log-line';
+            lineDiv.textContent = displayLine;
+            publishConsole.appendChild(lineDiv);
+          }
+        }
+
+        // Trigger dashboard stats/repos reload
+        await fetchData();
+
+      } catch (err) {
+        const lineDiv = document.createElement('div');
+        lineDiv.className = 'log-line';
+        lineDiv.style.color = 'var(--error-color)';
+        lineDiv.textContent = `[ERROR] Connection error: ${err.message}`;
+        publishConsole.appendChild(lineDiv);
+      } finally {
+        // Re-enable close button and reset inputs
+        btnCancelPublish.disabled = false;
+        btnCancelPublish.textContent = 'Close';
+        btnStartPublish.disabled = false;
+        publishLocalPath.disabled = false;
+        publishRemoteUrl.disabled = false;
+        publishConsole.scrollTop = publishConsole.scrollHeight;
+      }
+    }
+
 
     // Run startup
     init();

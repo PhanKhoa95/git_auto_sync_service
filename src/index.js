@@ -238,6 +238,114 @@ function startServer(port) {
           res.end(JSON.stringify({ success: false, message: e.message }));
         }
       });
+    } else if (req.method === 'POST' && reqPath === '/api/publish') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.localPath || !parsed.remoteUrl) {
+            throw new Error('Missing localPath or remoteUrl.');
+          }
+
+          if (!fs.existsSync(parsed.localPath)) {
+            throw new Error('Local path does not exist.');
+          }
+
+          const gitDir = path.join(parsed.localPath, '.git');
+          if (fs.existsSync(gitDir)) {
+            throw new Error('Local path already contains a .git directory. It is already a Git repository.');
+          }
+
+          res.writeHead(200, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Transfer-Encoding': 'chunked',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
+
+          res.write(`[INFO] Starting publish sequence for local folder: ${parsed.localPath}...\n`);
+
+          const { spawn } = require('child_process');
+          const opts = {
+            cwd: parsed.localPath,
+            env: {
+              ...process.env,
+              GIT_TERMINAL_PROMPT: '0',
+              GCM_INTERACTIVE: 'never'
+            }
+          };
+
+          function spawnAndStream(cmd, args) {
+            return new Promise((resolve, reject) => {
+              res.write(`\n[INFO] Running: ${cmd} ${args.join(' ')}\n`);
+              const child = spawn(cmd, args, opts);
+
+              child.stdout.on('data', data => {
+                res.write(data);
+              });
+
+              child.stderr.on('data', data => {
+                res.write(data);
+              });
+
+              child.on('error', err => {
+                res.write(`[ERROR] Process error: ${err.message}\n`);
+                reject(err);
+              });
+
+              child.on('close', code => {
+                if (code === 0) {
+                  resolve();
+                } else {
+                  const errMsg = `Exited with code ${code}`;
+                  res.write(`[ERROR] ${cmd} failed: ${errMsg}\n`);
+                  reject(new Error(errMsg));
+                }
+              });
+            });
+          }
+
+          (async () => {
+            try {
+              // 1. git init
+              await spawnAndStream('git', ['init']);
+
+              // 2. git add .
+              await spawnAndStream('git', ['add', '.']);
+
+              // 3. git commit
+              await spawnAndStream('git', ['commit', '-m', 'Initial commit from Auto-Sync Dashboard']);
+
+              // 4. git branch -M main
+              await spawnAndStream('git', ['branch', '-M', 'main']);
+
+              // 5. git remote add origin
+              await spawnAndStream('git', ['remote', 'add', 'origin', parsed.remoteUrl]);
+
+              // 6. git push -u origin main
+              await spawnAndStream('git', ['push', '-u', 'origin', 'main']);
+
+              res.write(`\n[SUCCESS] Project published successfully to ${parsed.remoteUrl}\n`);
+
+              try {
+                const { forceGlobalScan } = require('./repo-watcher');
+                forceGlobalScan();
+              } catch (e) {
+                res.write(`[WARN] Failed to trigger repository scan: ${e.message}\n`);
+              }
+            } catch (err) {
+              res.write(`\n[ERROR] Publish sequence failed: ${err.message}\n`);
+            } finally {
+              res.end();
+            }
+          })();
+
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
     } else if (req.method === 'GET' && reqPath === '/api/status') {
       const { getWatchedRepositoriesMetadata } = require('./repo-watcher');
       const metadata = getWatchedRepositoriesMetadata();
