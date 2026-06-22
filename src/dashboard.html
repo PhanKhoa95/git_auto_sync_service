@@ -1494,7 +1494,7 @@
     }
 
     async function runRepoAuth(repoPath) {
-      if (!confirm('Bạn có muốn đăng nhập hoặc sửa quyền ghi cho thư mục repository này?\nThao tác này sẽ mở một cửa sổ Command Prompt mới để thực hiện lệnh "git push" và kích hoạt trình quản lý thông tin đăng nhập Git (Git Credential Manager).')) {
+      if (!confirm('Bạn có muốn đăng nhập hoặc sửa quyền ghi cho thư mục repository này?\nThao tác này sẽ tự động xóa thông tin đăng nhập Github cũ và mở một cửa sổ Command Prompt mới để bạn thực hiện đăng nhập tài khoản mới.')) {
         return;
       }
       try {
@@ -1505,12 +1505,58 @@
         });
         const result = await response.json();
         if (result.success) {
-          alert('Đã mở cửa sổ Command Prompt để đăng nhập Git cho repository. Vui lòng hoàn thành đăng nhập trong cửa sổ lệnh đó.');
+          alert('Đã mở cửa sổ Command Prompt. Vui lòng hoàn thành việc đăng nhập tài khoản mới trong cửa sổ lệnh đó.');
         } else {
           alert('Không thể mở cửa sổ đăng nhập Git: ' + result.message);
         }
       } catch (err) {
         alert('Lỗi khi đăng nhập Git: ' + err.message);
+      }
+    }
+
+    async function fixSafeDirectory(repoPath) {
+      if (!confirm('Bạn có muốn tự động thêm thư mục này vào danh sách an toàn (safe.directory) của Git không?\nThao tác này giúp sửa lỗi quyền sở hữu thư mục Git.')) {
+        return;
+      }
+      try {
+        const response = await fetch('/api/add-safe-directory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoPath })
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert('Đã thêm vào danh sách safe.directory thành công! Hệ thống đang quét lại thư mục.');
+          fetchData();
+        } else {
+          alert('Không thể cấu hình safe.directory: ' + result.message);
+        }
+      } catch (err) {
+        alert('Lỗi khi cấu hình safe.directory: ' + err.message);
+      }
+    }
+
+    async function fixGitIdentity(repoPath) {
+      const name = prompt('Nhập tên người dùng Git mới (user.name):');
+      if (name === null) return;
+      const email = prompt('Nhập địa chỉ email Git mới (user.email):');
+      if (email === null) return;
+
+      try {
+        const response = await fetch('/api/set-git-identity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoPath, name: name.trim(), email: email.trim() })
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert('Đã cấu hình danh tính Git thành công! Hệ thống đang quét lại thư mục.');
+          fetchData();
+        } else {
+          alert('Không thể cấu hình danh tính Git: ' + result.message);
+        }
+      } catch (err) {
+        alert('Lỗi khi cấu hình danh tính Git: ' + err.message);
       }
     }
 
