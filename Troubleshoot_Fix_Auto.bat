@@ -15,11 +15,12 @@ echo [3] Kiểm tra & Cấu hình danh tính Git (User Name/Email)
 echo [4] Kiểm tra & Bật Trình quản lý Đăng nhập (GCM Helper)
 echo [5] Kiểm tra & Sửa quyền bảo mật thư mục (safe.directory)
 echo [6] Thử kết nối từ xa & Đăng nhập (Git Push dry-run)
-echo [7] Xem nhật ký hoạt động (15 dòng log gần nhất)
-echo [8] Thoát
+echo [7] Đăng xuất / Xóa tài khoản GitHub đang lưu (Sign out)
+echo [8] Xem nhật ký hoạt động (15 dòng log gần nhất)
+echo [9] Thoát
 echo.
 echo ==================================================
-set /p CHOICE="Chọn một tùy chọn (1-8): "
+set /p CHOICE="Chọn một tùy chọn (1-9): "
 
 if "%CHOICE%"=="1" goto DAEMON_STATUS
 if "%CHOICE%"=="2" goto NETWORK_CHECK
@@ -27,8 +28,9 @@ if "%CHOICE%"=="3" goto GIT_IDENTITY
 if "%CHOICE%"=="4" goto GCM_HELPER
 if "%CHOICE%"=="5" goto SAFE_DIR
 if "%CHOICE%"=="6" goto REMOTE_AUTH
-if "%CHOICE%"=="7" goto VIEW_LOGS
-if "%CHOICE%"=="8" goto EXIT
+if "%CHOICE%"=="7" goto CLEAR_GCM
+if "%CHOICE%"=="8" goto VIEW_LOGS
+if "%CHOICE%"=="9" goto EXIT
 goto MENU
 
 :DAEMON_STATUS
