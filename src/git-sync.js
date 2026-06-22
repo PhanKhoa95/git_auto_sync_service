@@ -2,7 +2,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
-const { showNotification, showGitErrorNotification } = require('./notifier');
+const { showNotification, showGitErrorNotification, showGitSuccessNotification } = require('./notifier');
 const { registerChildProcess } = require('./child-process-registry');
 
 function getErrorMessage(err) {
@@ -299,8 +299,11 @@ async function performSync(repoPath) {
     if (hasOrigin) {
       logger.info(`[${repoName}] Pulling latest changes from origin ${branch}...`);
       try {
-        await runGit(repoPath, ['pull', 'origin', branch]);
+        const { stdout } = await runGit(repoPath, ['pull', 'origin', branch]);
         logger.info(`[${repoName}] Pull successful.`);
+        if (stdout && !stdout.includes('Already up to date.') && !stdout.includes('Already up-to-date.')) {
+          showGitSuccessNotification(repoName, 'pull');
+        }
       } catch (err) {
         const stderr = (err.stderr || '').toLowerCase();
         // If the remote branch doesn't exist yet (e.g. empty repository/new branch), proceed instead of failing

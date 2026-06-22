@@ -130,4 +130,22 @@ function showGitErrorNotification(repoName, action, rawError) {
   showNotification(title, message);
 }
 
-module.exports = { showNotification, showGitErrorNotification };
+/**
+ * Shows a user-friendly success notification when a repository sync or pull succeeds.
+ */
+function showGitSuccessNotification(repoName, type) {
+  let title = `Đồng bộ [${repoName}]`;
+  let message = `Tiến trình đồng bộ thành công.`;
+
+  if (type === 'push') {
+    title = `Đồng bộ thành công [${repoName}]`;
+    message = `Đã tự động sao lưu và đẩy các thay đổi lên GitHub thành công.`;
+  } else if (type === 'pull') {
+    title = `Đã tải bản cập nhật [${repoName}]`;
+    message = `Đã cập nhật các thay đổi mới nhất từ GitHub về máy thành công.`;
+  }
+
+  showNotification(title, message);
+}
+
+module.exports = { showNotification, showGitErrorNotification, showGitSuccessNotification };
