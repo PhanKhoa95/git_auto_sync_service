@@ -1232,15 +1232,51 @@
 
           let errorBannerHtml = '';
           if (repo.lastSyncError) {
-            const isAuthError = repo.lastSyncError.includes('xác thực') || repo.lastSyncError.includes('403') || repo.lastSyncError.includes('quyền ghi') || repo.lastSyncError.includes('permission');
-            const authButtonHtml = isAuthError 
-              ? `<button class="btn btn-sm btn-danger" style="margin-top: 0.4rem; padding: 0.2rem 0.5rem; font-size: 0.7rem; display: flex; align-items: center; gap: 0.25rem;" onclick="runRepoAuth('${repoPath.replace(/\\/g, '\\\\')}')">
+            const errLower = repo.lastSyncError.toLowerCase();
+            const isAuthError = errLower.includes('xác thực') || errLower.includes('403') || errLower.includes('quyền ghi') || errLower.includes('permission');
+            const isSafeDirError = errLower.includes('safe.directory') || errLower.includes('ownership') || errLower.includes('sở hữu');
+            const isIdentityError = errLower.includes('identity') || errLower.includes('danh tính') || errLower.includes('user.name') || errLower.includes('email');
+            const isConflictError = errLower.includes('conflict') || errLower.includes('xung đột');
+
+            let actionButtonHtml = '';
+            if (isAuthError) {
+              actionButtonHtml = `
+                <button class="btn btn-sm btn-danger" style="margin-top: 0.4rem; padding: 0.2rem 0.5rem; font-size: 0.7rem; display: flex; align-items: center; gap: 0.25rem;" onclick="runRepoAuth('${repoPath.replace(/\\/g, '\\\\')}')">
                   <svg style="width: 12px; height: 12px; fill: currentColor;" viewBox="0 0 24 24">
                     <path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
                   </svg>
                   Đăng Nhập Git / Sửa Quyền Ghi
-                 </button>`
-              : '';
+                </button>
+              `;
+            } else if (isSafeDirError) {
+              actionButtonHtml = `
+                <button class="btn btn-sm btn-danger" style="margin-top: 0.4rem; padding: 0.2rem 0.5rem; font-size: 0.7rem; display: flex; align-items: center; gap: 0.25rem;" onclick="fixSafeDirectory('${repoPath.replace(/\\/g, '\\\\')}')">
+                  <svg style="width: 12px; height: 12px; fill: currentColor;" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                  </svg>
+                  Thêm Vào Danh Sách An Toàn (safe.directory)
+                </button>
+              `;
+            } else if (isIdentityError) {
+              actionButtonHtml = `
+                <button class="btn btn-sm btn-danger" style="margin-top: 0.4rem; padding: 0.2rem 0.5rem; font-size: 0.7rem; display: flex; align-items: center; gap: 0.25rem;" onclick="fixGitIdentity('${repoPath.replace(/\\/g, '\\\\')}')">
+                  <svg style="width: 12px; height: 12px; fill: currentColor;" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                  Cấu HÌnh Danh Tính Git (User Name/Email)
+                </button>
+              `;
+            } else if (isConflictError) {
+              actionButtonHtml = `
+                <button class="btn btn-sm btn-danger" style="margin-top: 0.4rem; padding: 0.2rem 0.5rem; font-size: 0.7rem; display: flex; align-items: center; gap: 0.25rem;" onclick="openLocalFolder('${repoPath.replace(/\\/g, '\\\\')}')">
+                  <svg style="width: 12px; height: 12px; fill: currentColor;" viewBox="0 0 24 24">
+                    <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z"/>
+                  </svg>
+                  Mở Thư Mục Để Giải Quyết Xung Đột
+                </button>
+              `;
+            }
+
             errorBannerHtml = `
               <div class="repo-error-banner" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; color: var(--error-color); background: rgba(255, 23, 68, 0.04); border: 1px dashed rgba(255, 23, 68, 0.25); border-radius: 4px; padding: 0.4rem 0.6rem; margin-top: 0.5rem; font-size: 0.75rem; line-height: 1.3;">
                 <div style="display: flex; align-items: flex-start; gap: 0.35rem;">
@@ -1249,7 +1285,7 @@
                   </svg>
                   <span>${repo.lastSyncError}</span>
                 </div>
-                ${authButtonHtml}
+                ${actionButtonHtml}
               </div>
             `;
           }
