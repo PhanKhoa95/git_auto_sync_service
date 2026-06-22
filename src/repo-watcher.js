@@ -360,11 +360,12 @@ function reloadWatcher() {
 
 function getWatchedRepositoriesMetadata() {
   const metadata = {};
-  const { getRemoteOriginUrl, getLastSyncTime } = require('./git-sync');
+  const { getRemoteOriginUrl, getLastSyncTime, getLastSyncError } = require('./git-sync');
   for (const repoPath of watchers.keys()) {
     metadata[repoPath] = {
       remoteOrigin: getRemoteOriginUrl(repoPath),
-      lastSyncTime: getLastSyncTime(repoPath)
+      lastSyncTime: getLastSyncTime(repoPath),
+      lastSyncError: getLastSyncError(repoPath)
     };
   }
   return {
