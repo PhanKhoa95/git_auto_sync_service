@@ -277,12 +277,14 @@ async function performSync(repoPath) {
         branch = stdout.trim();
       } catch (err) {
         logger.error(`[${repoName}] Failed to get current branch name: ${getErrorMessage(err)}`);
+        showNotification(`Git Auto-Sync [${repoName}]`, `Failed to get current branch name: ${getErrorMessage(err)}`);
         return;
       }
     }
 
     if (branch === 'HEAD' || branch.includes('(no branch)')) {
       logger.warn(`[${repoName}] Repository is in detached HEAD state. Skipping sync.`);
+      showNotification(`Git Auto-Sync [${repoName}]`, `Skipping sync: Repository is in detached HEAD state.`);
       return;
     }
 
@@ -334,6 +336,7 @@ async function performSync(repoPath) {
       statusOutput = stdout.trim();
     } catch (err) {
       logger.error(`[${repoName}] Failed to check status: ${getErrorMessage(err)}`);
+      showNotification(`Git Auto-Sync [${repoName}]`, `Failed to check status: ${getErrorMessage(err)}`);
       return;
     }
 
@@ -349,6 +352,7 @@ async function performSync(repoPath) {
       await runGit(repoPath, ['add', '-A']);
     } catch (err) {
       logger.error(`[${repoName}] Staging failed: ${getErrorMessage(err)}`);
+      showNotification(`Git Auto-Sync [${repoName}]`, `Staging failed: ${getErrorMessage(err)}`);
       return;
     }
 
