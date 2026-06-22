@@ -288,14 +288,14 @@ async function performSync(repoPath) {
         branch = stdout.trim();
       } catch (err) {
         logger.error(`[${repoName}] Failed to get current branch name: ${getErrorMessage(err)}`);
-        showGitErrorNotification(repoName, 'kiểm tra nhánh', getErrorMessage(err));
+        reportGitError(repoPath, repoName, 'kiểm tra nhánh', getErrorMessage(err));
         return;
       }
     }
 
     if (branch === 'HEAD' || branch.includes('(no branch)')) {
       logger.warn(`[${repoName}] Repository is in detached HEAD state. Skipping sync.`);
-      showGitErrorNotification(repoName, 'đồng bộ', 'detached head');
+      reportGitError(repoPath, repoName, 'đồng bộ', 'detached head');
       return;
     }
 
@@ -312,6 +312,7 @@ async function performSync(repoPath) {
       try {
         const { stdout } = await runGit(repoPath, ['pull', 'origin', branch]);
         logger.info(`[${repoName}] Pull successful.`);
+        lastSyncErrors.delete(repoPath);
         if (stdout && !stdout.includes('Already up to date.') && !stdout.includes('Already up-to-date.')) {
           showGitSuccessNotification(repoName, 'pull');
         }
@@ -329,14 +330,14 @@ async function performSync(repoPath) {
             const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
             logger.error(`[${repoName}] Pull with unrelated histories failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
-            showGitErrorNotification(repoName, 'cập nhật (pull)', errDetails);
+            reportGitError(repoPath, repoName, 'cập nhật (pull)', errDetails);
             return;
           }
         } else {
           const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
           logger.error(`[${repoName}] Pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
           await abortMergeIfNeeded(repoPath, repoName);
-          showGitErrorNotification(repoName, 'cập nhật (pull)', errDetails);
+          reportGitError(repoPath, repoName, 'cập nhật (pull)', errDetails);
           logger.warn(`[${repoName}] Skipping remainder of synchronization cycle to prevent conflict compounding.`);
           return;
         }
@@ -350,13 +351,14 @@ async function performSync(repoPath) {
       statusOutput = stdout.trim();
     } catch (err) {
       logger.error(`[${repoName}] Failed to check status: ${getErrorMessage(err)}`);
-      showGitErrorNotification(repoName, 'kiểm tra trạng thái', getErrorMessage(err));
+      reportGitError(repoPath, repoName, 'kiểm tra trạng thái', getErrorMessage(err));
       return;
     }
 
     if (!statusOutput) {
       logger.info(`[${repoName}] Working tree clean. No local modifications to sync.`);
       lastSyncTimes.set(repoPath, new Date().toISOString());
+      lastSyncErrors.delete(repoPath);
       return;
     }
 
@@ -366,7 +368,7 @@ async function performSync(repoPath) {
       await runGit(repoPath, ['add', '-A']);
     } catch (err) {
       logger.error(`[${repoName}] Staging failed: ${getErrorMessage(err)}`);
-      showGitErrorNotification(repoName, 'lưu thay đổi (stage)', getErrorMessage(err));
+      reportGitError(repoPath, repoName, 'lưu thay đổi (stage)', getErrorMessage(err));
       return;
     }
 
@@ -389,12 +391,12 @@ async function performSync(repoPath) {
           logger.info(`[${repoName}] Commit successful after identity self-fixing.`);
         } catch (retryErr) {
           logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${getErrorMessage(retryErr)}`);
-          showGitErrorNotification(repoName, 'ghi nhận thay đổi (commit)', 'please tell me who you are');
+          reportGitError(repoPath, repoName, 'ghi nhận thay đổi (commit)', 'please tell me who you are');
           return;
         }
       } else {
         logger.error(`[${repoName}] Commit failed: ${getErrorMessage(err)}`);
-        showGitErrorNotification(repoName, 'ghi nhận thay đổi (commit)', getErrorMessage(err));
+        reportGitError(repoPath, repoName, 'ghi nhận thay đổi (commit)', getErrorMessage(err));
         return;
       }
     }
@@ -405,6 +407,7 @@ async function performSync(repoPath) {
       try {
         await runGit(repoPath, ['push', 'origin', branch]);
         logger.info(`[${repoName}] Push successful.`);
+        lastSyncErrors.delete(repoPath);
         showGitSuccessNotification(repoName, 'push');
       } catch (err) {
         const stderr = (err.stderr || '').toLowerCase();
@@ -425,18 +428,19 @@ async function performSync(repoPath) {
             logger.info(`[${repoName}] Pull successful. Re-trying push...`);
             await runGit(repoPath, ['push', 'origin', branch]);
             logger.info(`[${repoName}] Push successful after retrying.`);
+            lastSyncErrors.delete(repoPath);
             showGitSuccessNotification(repoName, 'push');
           } catch (retryErr) {
             const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
             logger.error(`[${repoName}] Pull/push recovery failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
-            showGitErrorNotification(repoName, 'đẩy thay đổi (push)', errDetails);
+            reportGitError(repoPath, repoName, 'đẩy thay đổi (push)', errDetails);
             return;
           }
         } else {
           const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
           logger.error(`[${repoName}] Push failed: ${getErrorMessage(err)}. Output: ${err.stderr.trim()}`);
-          showGitErrorNotification(repoName, 'đẩy thay đổi (push)', errDetails);
+          reportGitError(repoPath, repoName, 'đẩy thay đổi (push)', errDetails);
           return;
         }
       }
@@ -444,6 +448,7 @@ async function performSync(repoPath) {
 
     logger.info(`[${repoName}] Synchronization cycle completed successfully.`);
     lastSyncTimes.set(repoPath, new Date().toISOString());
+    lastSyncErrors.delete(repoPath);
   } catch (err) {
     logger.error(`[${repoName}] Unexpected error during sync: ${getErrorMessage(err)}`);
   }
@@ -492,9 +497,11 @@ async function pullOnly(repoPath) {
           const { stdout } = await runGit(repoPath, ['pull', 'origin', branch]);
           if (stdout.includes('Already up to date.') || stdout.includes('Already up-to-date.')) {
             // No new remote changes
+            lastSyncErrors.delete(repoPath);
           } else {
             logger.info(`[${repoName}] Pull successful: Remote changes fetched.`);
             lastSyncTimes.set(repoPath, new Date().toISOString());
+            lastSyncErrors.delete(repoPath);
             showGitSuccessNotification(repoName, 'pull');
           }
         } catch (err) {
@@ -507,18 +514,19 @@ async function pullOnly(repoPath) {
               await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
               logger.info(`[${repoName}] Periodic pull with unrelated histories successful.`);
               lastSyncTimes.set(repoPath, new Date().toISOString());
+              lastSyncErrors.delete(repoPath);
               showGitSuccessNotification(repoName, 'pull');
             } catch (retryErr) {
               const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
               logger.error(`[${repoName}] Periodic pull with unrelated histories failed: ${getErrorMessage(retryErr)}`);
               await abortMergeIfNeeded(repoPath, repoName);
-              showGitErrorNotification(repoName, 'cập nhật tự động (pull)', errDetails);
+              reportGitError(repoPath, repoName, 'cập nhật tự động (pull)', errDetails);
             }
           } else {
             const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
             logger.error(`[${repoName}] Periodic pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
-            showGitErrorNotification(repoName, 'cập nhật tự động (pull)', errDetails);
+            reportGitError(repoPath, repoName, 'cập nhật tự động (pull)', errDetails);
           }
         }
       }
