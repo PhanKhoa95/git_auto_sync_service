@@ -233,4 +233,42 @@ describe('Tier 3 Integration & System Tests', function () {
     const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
     expect(files).to.include('junction_test.txt');
   });
+
+  // TC-T3-06: E2E periodic remote pull
+  it('TC-T3-06: E2E periodic remote pull', async () => {
+    const localPath = harness.createMockRepo('repo1', true);
+    const bareRepoPath = path.join(harness.remotesPath, 'repo1.git');
+
+    // Start daemon with REMOTE_PULL_INTERVAL = 2000 (2 seconds)
+    harness.startDaemon({ DEBOUNCE_DELAY: '500', REMOTE_PULL_INTERVAL: '2000' });
+    await harness.waitForDaemonReady();
+
+    // Create a peer clone and push a remote change
+    const peerRepoPath = path.join(harness.sandboxRoot, 'peer_repo');
+    harness.gitCmd(harness.sandboxRoot, ['clone', bareRepoPath, 'peer_repo']);
+    harness.gitCmd(peerRepoPath, ['config', 'user.name', 'PeerTester']);
+    harness.gitCmd(peerRepoPath, ['config', 'user.email', 'peer@tester.local']);
+
+    fs.writeFileSync(path.join(peerRepoPath, 'periodic_pulled.txt'), 'remote periodic content');
+    harness.gitCmd(peerRepoPath, ['add', 'periodic_pulled.txt']);
+    harness.gitCmd(peerRepoPath, ['commit', '-m', 'remote periodic commit']);
+    harness.gitCmd(peerRepoPath, ['push', 'origin', 'master']);
+
+    // Now, without making any local changes in repo1, the daemon on repo1 should pull this file automatically!
+    // Let's poll repo1 to see if periodic_pulled.txt appears
+    const start = Date.now();
+    let fileAppeared = false;
+    const localFilePath = path.join(localPath, 'periodic_pulled.txt');
+    while (Date.now() - start < 15000) { // 15 seconds max wait
+      if (fs.existsSync(localFilePath)) {
+        fileAppeared = true;
+        break;
+      }
+      await delay(200);
+    }
+
+    expect(fileAppeared).to.be.true;
+    const content = fs.readFileSync(localFilePath, 'utf8');
+    expect(content).to.equal('remote periodic content');
+  });
 });
