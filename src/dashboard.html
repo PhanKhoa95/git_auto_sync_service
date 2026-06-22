@@ -689,6 +689,12 @@
           </svg>
           Chạy Cài Đặt Autopilot
         </button>
+        <button class="btn btn-sm" id="btnRunTroubleshoot" style="background: rgba(255, 112, 67, 0.08); border-color: rgba(255, 112, 67, 0.2); color: #ff7043;" title="Mở trình khắc phục sự cố tương tác để kiểm tra dịch vụ, danh tính Git, GCM, mạng và logs.">
+          <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
+            <path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.3C.5 6.7.9 9.8 2.9 11.8c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.4-.4.4-1.1 0-1.5z"/>
+          </svg>
+          Khắc Phục Sự Cố
+        </button>
         <button class="btn btn-sm" id="btnOpenSettings">
           <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
             <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38(1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38-1.03-.7-1.62-.94l-.36-2.54c.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.44-.17-.47-.41l-.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
@@ -977,6 +983,7 @@
     const disconnectOverlay = document.getElementById('disconnectOverlay');
     const btnRetryConnect = document.getElementById('btnRetryConnect');
     const btnRunAutopilotSetup = document.getElementById('btnRunAutopilotSetup');
+    const btnRunTroubleshoot = document.getElementById('btnRunTroubleshoot');
 
     // Clone Modal Elements
     const btnOpenCloneModal = document.getElementById('btnOpenCloneModal');
@@ -1029,6 +1036,8 @@
 
       // Autopilot Setup listener
       btnRunAutopilotSetup.addEventListener('click', runAutopilotSetup);
+      // Troubleshoot listener
+      btnRunTroubleshoot.addEventListener('click', runTroubleshoot);
     }
 
     // Set connection status
@@ -1428,6 +1437,23 @@
         }
       } catch (err) {
         alert('Lỗi khi chạy thiết lập Autopilot: ' + err.message);
+      }
+    }
+
+    async function runTroubleshoot() {
+      if (!confirm('Bạn có muốn mở Trình Khắc Phục Sự Cố để tự động kiểm tra và sửa cấu hình Git / Dịch vụ không?\nThao tác này sẽ mở một cửa sổ Command Prompt mới hiển thị menu tương tác.')) {
+        return;
+      }
+      try {
+        const response = await fetch('/api/run-troubleshoot', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+          alert('Đã kích hoạt Trình Khắc Phục Sự Cố! Hãy kiểm tra cửa sổ Command Prompt mới xuất hiện trên màn hình máy tính của bạn.');
+        } else {
+          alert('Không thể khởi chạy Trình Khắc Phục Sự Cố: ' + result.message);
+        }
+      } catch (err) {
+        alert('Lỗi khi chạy Trình Khắc Phục Sự Cố: ' + err.message);
       }
     }
 
