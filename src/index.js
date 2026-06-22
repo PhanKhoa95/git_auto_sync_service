@@ -514,6 +514,17 @@ function startServer(port) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, message: e.message }));
       }
+    } else if (req.method === 'POST' && reqPath === '/api/run-troubleshoot') {
+      try {
+        const { exec } = require('child_process');
+        const projectRoot = path.resolve(__dirname, '..');
+        exec(`cmd.exe /c start Troubleshoot_Fix_Auto.bat`, { cwd: projectRoot });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, message: e.message }));
+      }
     } else if (req.method === 'POST' && reqPath === '/api/run-repo-auth') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
