@@ -621,16 +621,22 @@ function startServer(port) {
     } else if (req.method === 'POST' && reqPath === '/api/sync') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
           const parsed = JSON.parse(body);
           if (!parsed.repoPath) {
             throw new Error('Missing repoPath parameter.');
           }
-          const { syncRepository } = require('./git-sync');
-          syncRepository(parsed.repoPath);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
+          const { syncRepository, getLastSyncError } = require('./git-sync');
+          await syncRepository(parsed.repoPath);
+          const error = getLastSyncError(parsed.repoPath);
+          if (error) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, message: error }));
+          } else {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+          }
         } catch (e) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, message: e.message }));
