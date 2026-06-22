@@ -1,7 +1,7 @@
 {
   "debounceDelayMs": 10000,
   "monitoredRoots": [
-    "E:\\"
+    "L:\\"
   ],
   "ignoredPatterns": [
     ".git",
