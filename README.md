@@ -56,3 +56,5 @@ graph TD
 ```
 
 Nếu kho lưu trữ chưa cấu hình liên kết từ xa (`remote origin`), dịch vụ sẽ chỉ thực hiện commit cục bộ và bỏ qua bước đẩy để đảm bảo không gây gián đoạn hoặc lỗi hệ thống.
+
+# Triggering a change for testing notifications
