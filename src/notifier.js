@@ -42,6 +42,25 @@ $ToastMessage = [Windows.UI.Notifications.ToastNotification]::New($ToastXml)
       windowsHide: true
     });
 
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        logger.error(`PowerShell notification process exited with code ${code}. Title: "${title}". Message: "${message}". Stdout: ${stdout.trim()}. Stderr: ${stderr.trim()}`);
+      } else {
+        logger.debug(`Notification successfully triggered via PowerShell: ${title}`);
+      }
+    });
+
     child.on('error', (err) => {
       logger.error(`Failed to spawn PowerShell for notification: ${err.message}`);
     });
