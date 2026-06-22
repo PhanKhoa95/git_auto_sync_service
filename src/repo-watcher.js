@@ -91,71 +91,68 @@ async function isGitRepo(dir) {
 }
 
 /**
+ * Recursively scans a directory for Git repositories up to maxDepth.
+ * Bypasses symlinks and configured ignored patterns.
+ */
+async function scanDirectory(dir, currentDepth, maxDepth, reposList) {
+  if (currentDepth > maxDepth) return;
+
+  if (await isGitRepo(dir)) {
+    reposList.push(dir);
+    return; // Do not recurse further inside a Git repository
+  }
+
+  let items;
+  try {
+    items = await fsPromises.readdir(dir);
+  } catch (err) {
+    return; // skip unreadable
+  }
+
+  const config = getConfig();
+  const ignoredPatterns = config.ignoredPatterns || ['.git', '.agents', '.sync.lock', 'node_modules'];
+
+  for (const item of items) {
+    if (item === '$RECYCLE.BIN' || item === 'System Volume Information' || ignoredPatterns.includes(item) || item === '.sync.lock') {
+      continue;
+    }
+
+    const fullPath = path.join(dir, item);
+    let stat;
+    try {
+      stat = await fsPromises.lstat(fullPath);
+    } catch (err) {
+      continue; // skip unreadable
+    }
+
+    if (stat.isSymbolicLink()) {
+      continue; // skip symbolic links to avoid circular loops
+    }
+
+    if (stat.isDirectory()) {
+      await scanDirectory(fullPath, currentDepth + 1, maxDepth, reposList);
+    }
+  }
+}
+
+/**
  * Scans a single root directory and its level-1 children for Git repositories asynchronously.
  */
 async function findGitRepositoriesForRoot(baseDir) {
   const repos = [];
 
   try {
-    try {
-      await fsPromises.access(baseDir);
-    } catch (e) {
-      logger.warn(`Base directory does not exist: ${baseDir}`);
-      return repos;
-    }
+    await fsPromises.access(baseDir);
+  } catch (e) {
+    logger.warn(`Base directory does not exist: ${baseDir}`);
+    return repos;
+  }
 
-    if (await isGitRepo(baseDir)) {
-      repos.push(baseDir);
-    }
+  const config = getConfig();
+  const maxDepth = config.maxScanDepth !== undefined ? config.maxScanDepth : 3;
 
-    let level1Items;
-    try {
-      level1Items = await fsPromises.readdir(baseDir);
-    } catch (err) {
-      logger.error(`Error listing base directory ${baseDir}: ${err.message}`);
-      return repos;
-    }
-
-    for (const item of level1Items) {
-      const fullPath = path.join(baseDir, item);
-
-      // Ignore Windows system / hidden folders
-      if (item === '$RECYCLE.BIN' || item === 'System Volume Information' || item === '.git' || item === '.agents') {
-        continue;
-      }
-
-      let stat;
-      try {
-        stat = await fsPromises.stat(fullPath);
-      } catch (err) {
-        continue; // skip unreadable
-      }
-
-      if (stat.isDirectory()) {
-        if (await isGitRepo(fullPath)) {
-          repos.push(fullPath);
-        } else {
-          let level2Items;
-          try {
-            level2Items = await fsPromises.readdir(fullPath);
-          } catch (err) {
-            continue; // skip unreadable level-1 subdirectory
-          }
-
-          for (const subItem of level2Items) {
-            const subFullPath = path.join(fullPath, subItem);
-
-            if (subItem === '$RECYCLE.BIN' || subItem === 'System Volume Information' || subItem === '.git' || subItem === '.agents') {
-              continue;
-            }
-
-            if (await isGitRepo(subFullPath)) {
-              repos.push(subFullPath);
-            }
-          }
-        }
-      }
-    }
+  try {
+    await scanDirectory(baseDir, 0, maxDepth, repos);
   } catch (err) {
     logger.error(`Error scanning directories in ${baseDir}: ${err.message}`);
   }
