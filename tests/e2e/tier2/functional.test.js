@@ -633,4 +633,31 @@ describe('Tier 2 Detailed Functional Tests', function () {
     const files = await waitForRemoteFile(remotePath, 'master', 'direct_sync.txt');
     expect(files).to.include('direct_sync.txt');
   });
+
+  // TC-T2-32: Sync unpushed commits even if working tree is clean
+  it('TC-T2-32: Sync unpushed commits even if working tree is clean', async () => {
+    harness.createMockRepo('repo1', true);
+    
+    // Create a commit locally while the daemon is not running
+    const localRepoPath = path.join(harness.virtualDrivePath, 'repo1');
+    harness.createFile('repo1', 'unpushed.txt', 'local unpushed commit');
+    harness.gitCmd(localRepoPath, ['add', '-A']);
+    harness.gitCmd(localRepoPath, ['commit', '-m', 'Manual local commit']);
+
+    // Ensure working tree is clean
+    const status = harness.gitCmd(localRepoPath, ['status', '--porcelain']).stdout.trim();
+    expect(status).to.equal('');
+
+    // Start daemon
+    harness.startDaemon({ DEBOUNCE_DELAY: '500' });
+    await harness.waitForDaemonReady();
+
+    // Wait for the manual commit to be pushed automatically
+    const remotePath = path.join(harness.remotesPath, 'repo1.git');
+    const commitMsg = await waitForRemoteCommit(remotePath, /Manual local commit/);
+    expect(commitMsg).to.include('Manual local commit');
+
+    const files = harness.gitCmd(remotePath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+    expect(files).to.include('unpushed.txt');
+  });
 });

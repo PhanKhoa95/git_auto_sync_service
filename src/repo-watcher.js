@@ -220,15 +220,38 @@ function startWatchingRepo(repoPath) {
 
     watchers.set(repoPath, watcher);
 
-    // Initial check on startup: trigger sync only if there are pending local changes
-    const { runGit } = require('./git-sync');
-    runGit(repoPath, ['status', '--porcelain']).then(({ stdout }) => {
-      if (stdout.trim()) {
-        logger.info(`[${repoName}] Pending local changes detected on startup. Triggering initial sync.`);
+    // Initial check on startup: trigger sync if there are pending local changes or unpushed commits
+    const { runGit, getBranchName, hasOriginRemote } = require('./git-sync');
+    Promise.all([
+      runGit(repoPath, ['status', '--porcelain']).then(({ stdout }) => stdout.trim()),
+      (async () => {
+        const branch = getBranchName(repoPath);
+        const hasOrigin = hasOriginRemote(repoPath);
+        if (branch && hasOrigin && branch !== 'HEAD' && !branch.includes('(no branch)')) {
+          try {
+            const { stdout } = await runGit(repoPath, ['rev-list', '--count', '@{u}..HEAD']);
+            const count = parseInt(stdout.trim(), 10);
+            return (!isNaN(count) && count > 0) ? 'unpushed' : '';
+          } catch (e) {
+            try {
+              const { stdout } = await runGit(repoPath, ['rev-list', '--count', `origin/${branch}..HEAD`]);
+              const count = parseInt(stdout.trim(), 10);
+              return (!isNaN(count) && count > 0) ? 'unpushed' : '';
+            } catch (e2) {}
+          }
+        }
+        return '';
+      })()
+    ]).then(([statusStr, unpushedStr]) => {
+      if (statusStr || unpushedStr) {
+        const reason = statusStr && unpushedStr 
+          ? 'pending local changes and unpushed commits' 
+          : (statusStr ? 'pending local changes' : 'unpushed commits');
+        logger.info(`[${repoName}] ${reason} detected on startup. Triggering initial sync.`);
         triggerSync(repoPath);
       }
-    }).catch(() => {
-      // ignore status errors on startup
+    }).catch((err) => {
+      logger.warn(`[${repoName}] Startup status check failed: ${err.message}`);
     });
   } catch (err) {
     logger.error(`[${repoName}] Failed to start file watcher: ${err.message}`);

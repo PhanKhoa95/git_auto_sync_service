@@ -355,49 +355,70 @@ async function performSync(repoPath) {
       return;
     }
 
-    if (!statusOutput) {
-      logger.info(`[${repoName}] Working tree clean. No local modifications to sync.`);
+    let hasUnpushedCommits = false;
+    if (hasOrigin) {
+      try {
+        const { stdout } = await runGit(repoPath, ['rev-list', '--count', '@{u}..HEAD']);
+        const count = parseInt(stdout.trim(), 10);
+        if (!isNaN(count) && count > 0) {
+          hasUnpushedCommits = true;
+        }
+      } catch (e) {
+        try {
+          const { stdout } = await runGit(repoPath, ['rev-list', '--count', `origin/${branch}..HEAD`]);
+          const count = parseInt(stdout.trim(), 10);
+          if (!isNaN(count) && count > 0) {
+            hasUnpushedCommits = true;
+          }
+        } catch (e2) {}
+      }
+    }
+
+    if (!statusOutput && !hasUnpushedCommits) {
+      logger.info(`[${repoName}] Working tree clean. No local modifications or unpushed commits to sync.`);
       lastSyncTimes.set(repoPath, new Date().toISOString());
       lastSyncErrors.delete(repoPath);
       return;
     }
 
     // 4. Stage all changes
-    logger.info(`[${repoName}] Staging all changes...`);
-    try {
-      await runGit(repoPath, ['add', '-A']);
-    } catch (err) {
-      logger.error(`[${repoName}] Staging failed: ${getErrorMessage(err)}`);
-      reportGitError(repoPath, repoName, 'lưu thay đổi (stage)', getErrorMessage(err));
-      return;
-    }
+    if (statusOutput) {
+      logger.info(`[${repoName}] Staging all changes...`);
+      try {
+        await runGit(repoPath, ['add', '-A']);
+      } catch (err) {
+        logger.error(`[${repoName}] Staging failed: ${getErrorMessage(err)}`);
+        reportGitError(repoPath, repoName, 'lưu thay đổi (stage)', getErrorMessage(err));
+        return;
+      }
 
-    // 5. Commit changes with timestamp
-    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const commitMessage = `Auto-sync: ${timestamp}`;
-    logger.info(`[${repoName}] Committing changes with message: "${commitMessage}"...`);
-    try {
-      await runGit(repoPath, ['commit', '-m', commitMessage]);
-      logger.info(`[${repoName}] Commit successful.`);
-    } catch (err) {
-      const stderr = (err.stderr || '').toLowerCase();
-      if (stderr.includes('tell me who you are') || stderr.includes('author identity unknown')) {
-        logger.warn(`[${repoName}] Git user identity not configured. Autopilot self-fixing: configuring local fallback user...`);
-        try {
-          await runGit(repoPath, ['config', 'user.name', 'Auto-Sync Autopilot']);
-          await runGit(repoPath, ['config', 'user.email', 'autopilot@sync.local']);
-          // Retry commit
-          await runGit(repoPath, ['commit', '-m', commitMessage]);
-          logger.info(`[${repoName}] Commit successful after identity self-fixing.`);
-        } catch (retryErr) {
-          logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${getErrorMessage(retryErr)}`);
-          reportGitError(repoPath, repoName, 'ghi nhận thay đổi (commit)', 'please tell me who you are');
+      // 5. Commit changes with timestamp
+      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const commitMessage = `Auto-sync: ${timestamp}`;
+      logger.info(`[${repoName}] Committing changes with message: "${commitMessage}"...`);
+      try {
+        await runGit(repoPath, ['commit', '-m', commitMessage]);
+        logger.info(`[${repoName}] Commit successful.`);
+      } catch (err) {
+        const stderr = (err.stderr || '').toLowerCase();
+        if (stderr.includes('tell me who you are') || stderr.includes('author identity unknown')) {
+          logger.warn(`[${repoName}] Git user identity not configured. Autopilot self-fixing: configuring local fallback user...`);
+          try {
+            await runGit(repoPath, ['config', 'user.name', 'Auto-Sync Autopilot']);
+            await runGit(repoPath, ['config', 'user.email', 'autopilot@sync.local']);
+            // Retry commit
+            await runGit(repoPath, ['commit', '-m', commitMessage]);
+            logger.info(`[${repoName}] Commit successful after identity self-fixing.`);
+          } catch (retryErr) {
+            logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${getErrorMessage(retryErr)}`);
+            reportGitError(repoPath, repoName, 'ghi nhận thay đổi (commit)', 'please tell me who you are');
+            return;
+          }
+        } else {
+          logger.error(`[${repoName}] Commit failed: ${getErrorMessage(err)}`);
+          reportGitError(repoPath, repoName, 'ghi nhận thay đổi (commit)', getErrorMessage(err));
           return;
         }
-      } else {
-        logger.error(`[${repoName}] Commit failed: ${getErrorMessage(err)}`);
-        reportGitError(repoPath, repoName, 'ghi nhận thay đổi (commit)', getErrorMessage(err));
-        return;
       }
     }
 
@@ -495,13 +516,38 @@ async function pullOnly(repoPath) {
         logger.info(`[${repoName}] Checking for remote updates (pulling from origin ${branch})...`);
         try {
           const { stdout } = await runGit(repoPath, ['pull', 'origin', branch]);
+          
+          let hasUnpushed = false;
+          try {
+            const { stdout: revStdout } = await runGit(repoPath, ['rev-list', '--count', '@{u}..HEAD']);
+            const count = parseInt(revStdout.trim(), 10);
+            if (!isNaN(count) && count > 0) {
+              hasUnpushed = true;
+            }
+          } catch (e) {
+            try {
+              const { stdout: revStdout2 } = await runGit(repoPath, ['rev-list', '--count', `origin/${branch}..HEAD`]);
+              const count = parseInt(revStdout2.trim(), 10);
+              if (!isNaN(count) && count > 0) {
+                hasUnpushed = true;
+              }
+            } catch (e2) {}
+          }
+
+          const existingError = lastSyncErrors.get(repoPath) || '';
+          const isPushError = existingError.includes('push') || existingError.includes('quyền ghi') || existingError.includes('xác thực') || existingError.includes('403') || existingError.includes('forbidden');
+
           if (stdout.includes('Already up to date.') || stdout.includes('Already up-to-date.')) {
             // No new remote changes
-            lastSyncErrors.delete(repoPath);
+            if (!hasUnpushed || !isPushError) {
+              lastSyncErrors.delete(repoPath);
+            }
           } else {
             logger.info(`[${repoName}] Pull successful: Remote changes fetched.`);
             lastSyncTimes.set(repoPath, new Date().toISOString());
-            lastSyncErrors.delete(repoPath);
+            if (!hasUnpushed || !isPushError) {
+              lastSyncErrors.delete(repoPath);
+            }
             showGitSuccessNotification(repoName, 'pull');
           }
         } catch (err) {
@@ -562,6 +608,8 @@ module.exports = {
   getLastSyncTime,
   getLastSyncError,
   clearRepositoryCache,
-  pullOnly
+  pullOnly,
+  getBranchName,
+  hasOriginRemote
 };
 
