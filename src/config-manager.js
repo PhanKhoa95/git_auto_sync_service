@@ -8,7 +8,8 @@ const DEFAULT_CONFIG = {
   debounceDelayMs: 10000,
   monitoredRoots: ['E:\\'],
   ignoredPatterns: ['.git', '.agents', 'sync.log', 'node_modules'],
-  maxScanDepth: 3
+  maxScanDepth: 3,
+  remotePullIntervalMs: 300000 // default 5 minutes
 };
 
 let currentConfig = null;
@@ -17,6 +18,7 @@ function loadConfig() {
   try {
     const envDebounce = process.env.DEBOUNCE_DELAY ? parseInt(process.env.DEBOUNCE_DELAY, 10) : null;
     const envMaxDepth = process.env.MAX_SCAN_DEPTH ? parseInt(process.env.MAX_SCAN_DEPTH, 10) : null;
+    const envPullInterval = process.env.REMOTE_PULL_INTERVAL ? parseInt(process.env.REMOTE_PULL_INTERVAL, 10) : null;
     if (fs.existsSync(CONFIG_FILE)) {
       const data = fs.readFileSync(CONFIG_FILE, 'utf8');
       const parsed = JSON.parse(data);
@@ -26,13 +28,15 @@ function loadConfig() {
         debounceDelayMs: envDebounce !== null && !isNaN(envDebounce) ? envDebounce : (typeof parsed.debounceDelayMs === 'number' ? parsed.debounceDelayMs : DEFAULT_CONFIG.debounceDelayMs),
         monitoredRoots: Array.isArray(parsed.monitoredRoots) ? parsed.monitoredRoots : DEFAULT_CONFIG.monitoredRoots,
         ignoredPatterns: Array.isArray(parsed.ignoredPatterns) ? parsed.ignoredPatterns : DEFAULT_CONFIG.ignoredPatterns,
-        maxScanDepth: envMaxDepth !== null && !isNaN(envMaxDepth) ? envMaxDepth : (typeof parsed.maxScanDepth === 'number' ? parsed.maxScanDepth : DEFAULT_CONFIG.maxScanDepth)
+        maxScanDepth: envMaxDepth !== null && !isNaN(envMaxDepth) ? envMaxDepth : (typeof parsed.maxScanDepth === 'number' ? parsed.maxScanDepth : DEFAULT_CONFIG.maxScanDepth),
+        remotePullIntervalMs: envPullInterval !== null && !isNaN(envPullInterval) ? envPullInterval : (typeof parsed.remotePullIntervalMs === 'number' ? parsed.remotePullIntervalMs : DEFAULT_CONFIG.remotePullIntervalMs)
       };
     } else {
       currentConfig = {
         ...DEFAULT_CONFIG,
         debounceDelayMs: envDebounce !== null && !isNaN(envDebounce) ? envDebounce : DEFAULT_CONFIG.debounceDelayMs,
-        maxScanDepth: envMaxDepth !== null && !isNaN(envMaxDepth) ? envMaxDepth : DEFAULT_CONFIG.maxScanDepth
+        maxScanDepth: envMaxDepth !== null && !isNaN(envMaxDepth) ? envMaxDepth : DEFAULT_CONFIG.maxScanDepth,
+        remotePullIntervalMs: envPullInterval !== null && !isNaN(envPullInterval) ? envPullInterval : DEFAULT_CONFIG.remotePullIntervalMs
       };
       saveConfig(currentConfig);
     }
@@ -40,10 +44,12 @@ function loadConfig() {
     logger.warn(`Failed to read config.json, using defaults: ${err.message}`);
     const envDebounce = process.env.DEBOUNCE_DELAY ? parseInt(process.env.DEBOUNCE_DELAY, 10) : null;
     const envMaxDepth = process.env.MAX_SCAN_DEPTH ? parseInt(process.env.MAX_SCAN_DEPTH, 10) : null;
+    const envPullInterval = process.env.REMOTE_PULL_INTERVAL ? parseInt(process.env.REMOTE_PULL_INTERVAL, 10) : null;
     currentConfig = {
       ...DEFAULT_CONFIG,
       debounceDelayMs: envDebounce !== null && !isNaN(envDebounce) ? envDebounce : DEFAULT_CONFIG.debounceDelayMs,
-      maxScanDepth: envMaxDepth !== null && !isNaN(envMaxDepth) ? envMaxDepth : DEFAULT_CONFIG.maxScanDepth
+      maxScanDepth: envMaxDepth !== null && !isNaN(envMaxDepth) ? envMaxDepth : DEFAULT_CONFIG.maxScanDepth,
+      remotePullIntervalMs: envPullInterval !== null && !isNaN(envPullInterval) ? envPullInterval : DEFAULT_CONFIG.remotePullIntervalMs
     };
   }
   return currentConfig;
