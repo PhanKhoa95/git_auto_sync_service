@@ -315,14 +315,14 @@ async function performSync(repoPath) {
             const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
             logger.error(`[${repoName}] Pull with unrelated histories failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
-            showNotification(`Git Auto-Sync [${repoName}]`, `Pull failed: ${errDetails}`);
+            showGitErrorNotification(repoName, 'cập nhật (pull)', errDetails);
             return;
           }
         } else {
           const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
           logger.error(`[${repoName}] Pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
           await abortMergeIfNeeded(repoPath, repoName);
-          showNotification(`Git Auto-Sync [${repoName}]`, `Pull failed: ${errDetails}`);
+          showGitErrorNotification(repoName, 'cập nhật (pull)', errDetails);
           logger.warn(`[${repoName}] Skipping remainder of synchronization cycle to prevent conflict compounding.`);
           return;
         }
@@ -336,7 +336,7 @@ async function performSync(repoPath) {
       statusOutput = stdout.trim();
     } catch (err) {
       logger.error(`[${repoName}] Failed to check status: ${getErrorMessage(err)}`);
-      showNotification(`Git Auto-Sync [${repoName}]`, `Failed to check status: ${getErrorMessage(err)}`);
+      showGitErrorNotification(repoName, 'kiểm tra trạng thái', getErrorMessage(err));
       return;
     }
 
@@ -352,7 +352,7 @@ async function performSync(repoPath) {
       await runGit(repoPath, ['add', '-A']);
     } catch (err) {
       logger.error(`[${repoName}] Staging failed: ${getErrorMessage(err)}`);
-      showNotification(`Git Auto-Sync [${repoName}]`, `Staging failed: ${getErrorMessage(err)}`);
+      showGitErrorNotification(repoName, 'lưu thay đổi (stage)', getErrorMessage(err));
       return;
     }
 
@@ -375,12 +375,12 @@ async function performSync(repoPath) {
           logger.info(`[${repoName}] Commit successful after identity self-fixing.`);
         } catch (retryErr) {
           logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${getErrorMessage(retryErr)}`);
-          showNotification(`Git Auto-Sync [${repoName}]`, `Commit failed: User identity not configured.`);
+          showGitErrorNotification(repoName, 'ghi nhận thay đổi (commit)', 'please tell me who you are');
           return;
         }
       } else {
         logger.error(`[${repoName}] Commit failed: ${getErrorMessage(err)}`);
-        showNotification(`Git Auto-Sync [${repoName}]`, `Commit failed: ${getErrorMessage(err)}`);
+        showGitErrorNotification(repoName, 'ghi nhận thay đổi (commit)', getErrorMessage(err));
         return;
       }
     }
