@@ -2,7 +2,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
-const { showNotification } = require('./notifier');
+const { showNotification, showGitErrorNotification } = require('./notifier');
 const { registerChildProcess } = require('./child-process-registry');
 
 function getErrorMessage(err) {
@@ -277,14 +277,14 @@ async function performSync(repoPath) {
         branch = stdout.trim();
       } catch (err) {
         logger.error(`[${repoName}] Failed to get current branch name: ${getErrorMessage(err)}`);
-        showNotification(`Git Auto-Sync [${repoName}]`, `Failed to get current branch name: ${getErrorMessage(err)}`);
+        showGitErrorNotification(repoName, 'kiểm tra nhánh', getErrorMessage(err));
         return;
       }
     }
 
     if (branch === 'HEAD' || branch.includes('(no branch)')) {
       logger.warn(`[${repoName}] Repository is in detached HEAD state. Skipping sync.`);
-      showNotification(`Git Auto-Sync [${repoName}]`, `Skipping sync: Repository is in detached HEAD state.`);
+      showGitErrorNotification(repoName, 'đồng bộ', 'detached head');
       return;
     }
 

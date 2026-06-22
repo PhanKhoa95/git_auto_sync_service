@@ -89,4 +89,45 @@ $ToastMessage = [Windows.UI.Notifications.ToastNotification]::New($ToastXml)
   }
 }
 
-module.exports = { showNotification };
+/**
+ * Translates a raw Git error message into a user-friendly, actionable description.
+ */
+function showGitErrorNotification(repoName, action, rawError) {
+  const rawLower = (rawError || '').toLowerCase();
+  let title = `Lỗi đồng bộ [${repoName}]`;
+  let message = `Đã xảy ra lỗi khi thực hiện ${action}.`;
+
+  if ((rawLower.includes('permission to') && rawLower.includes('denied to')) || rawLower.includes('error: 403') || rawLower.includes('403 forbidden')) {
+    title = `Lỗi xác thực GitHub [${repoName}]`;
+    message = `Tài khoản GitHub hiện tại không có quyền ghi. Hãy mở PowerShell tại thư mục này và chạy lệnh 'git push' để đăng nhập lại.`;
+  } else if (rawLower.includes('please tell me who you are') || rawLower.includes('user.name') || rawLower.includes('user.email')) {
+    title = `Chưa cấu hình Git [${repoName}]`;
+    message = `Git chưa cấu hình tên/email. Hãy thiết lập cấu hình Git (git config --global user.name/email) để tự động commit.`;
+  } else if (rawLower.includes('conflict') || rawLower.includes('merge failed') || rawLower.includes('automatic merge failed')) {
+    title = `Xung đột mã nguồn [${repoName}]`;
+    message = `Có thay đổi trùng lặp trên GitHub. Hãy mở Web Dashboard hoặc trình soạn thảo mã nguồn để giải quyết xung đột.`;
+  } else if (rawLower.includes('detached head')) {
+    title = `Lỗi trạng thái Git [${repoName}]`;
+    message = `Dự án đang ở trạng thái Detached HEAD. Hãy chuyển sang một nhánh hợp lệ (ví dụ: main hoặc master).`;
+  } else if (rawLower.includes('could not resolve host') || rawLower.includes('network is unreachable') || rawLower.includes('connection timed out')) {
+    title = `Mất kết nối mạng [${repoName}]`;
+    message = `Không thể kết nối đến máy chủ GitHub. Tiến trình sẽ tự động thử lại khi có mạng.`;
+  } else if (rawLower.includes('dubious ownership') || rawLower.includes('safe.directory')) {
+    title = `Lỗi bảo mật thư mục Git [${repoName}]`;
+    message = `Git phát hiện quyền sở hữu không khớp. Hãy mở terminal và chạy lệnh 'git config --global --add safe.directory <đường_dẫn_dự_án>'.`;
+  } else {
+    // Fallback: Clean up the error to show only the first few lines of useful text
+    const cleanLines = (rawError || '')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && !line.startsWith('Command failed:'))
+      .slice(0, 2);
+    if (cleanLines.length > 0) {
+      message = `Lỗi khi ${action}: ${cleanLines.join(' | ')}`;
+    }
+  }
+
+  showNotification(title, message);
+}
+
+module.exports = { showNotification, showGitErrorNotification };
