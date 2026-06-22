@@ -1321,7 +1321,7 @@
               <td style="text-align: right;">
                 <div style="display: inline-flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
                   ${onlineButtonHtml}
-                  <button class="btn btn-sm btn-primary" onclick="forceRepoSync('${repoPath.replace(/\\/g, '\\\\')}')">Sync Now</button>
+                  <button class="btn btn-sm btn-primary" onclick="forceRepoSync('${repoPath.replace(/\\/g, '\\\\')}', this)">Sync Now</button>
                 </div>
               </td>
             </tr>
@@ -1397,7 +1397,12 @@
     }
 
     // Actions
-    async function forceRepoSync(repoPath) {
+    async function forceRepoSync(repoPath, btn) {
+      if (btn) {
+        btn.textContent = 'Syncing...';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+      }
       try {
         const response = await fetch(API_SYNC_URL, {
           method: 'POST',
@@ -1406,13 +1411,19 @@
         });
         const result = await response.json();
         if (result.success) {
-          alert(`Sync triggered successfully for repository: ${repoPath}`);
-          fetchData();
+          alert(`Đồng bộ thành công cho repository:\n${repoPath}`);
         } else {
-          alert(`Failed to trigger sync: ${result.message}`);
+          alert(`Đồng bộ thất bại:\n${result.message}`);
         }
+        fetchData();
       } catch (err) {
-        alert(`Error triggering sync: ${err.message}`);
+        alert(`Lỗi khi đồng bộ: ${err.message}`);
+      } finally {
+        if (btn) {
+          btn.textContent = 'Sync Now';
+          btn.disabled = false;
+          btn.style.opacity = '1';
+        }
       }
     }
 
