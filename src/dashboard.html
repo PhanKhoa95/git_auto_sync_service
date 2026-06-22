@@ -683,11 +683,11 @@
           </svg>
           Publish Project
         </button>
-        <button class="btn btn-sm" id="btnRunAutopilotSetup" style="background: rgba(255, 214, 0, 0.08); border-color: rgba(255, 214, 0, 0.2); color: var(--warning-color);" title="Runs setup.bat in a visible Command Prompt window to configure Git Credential Manager, auto-startup, and caching.">
+        <button class="btn btn-sm" id="btnRunAutopilotSetup" style="background: rgba(255, 214, 0, 0.08); border-color: rgba(255, 214, 0, 0.2); color: var(--warning-color);" title="Chạy file setup.bat trong cửa sổ Command Prompt để cấu hình Git Credential Manager, tự khởi động và bộ nhớ đệm.">
           <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm0-4h-2V7h2v6z"/>
           </svg>
-          Run Autopilot Setup
+          Chạy Cài Đặt Autopilot
         </button>
         <button class="btn btn-sm" id="btnOpenSettings">
           <svg style="width: 14px; height: 14px; fill: currentColor; margin-right: 0.2rem;" viewBox="0 0 24 24">
@@ -976,6 +976,7 @@
     
     const disconnectOverlay = document.getElementById('disconnectOverlay');
     const btnRetryConnect = document.getElementById('btnRetryConnect');
+    const btnRunAutopilotSetup = document.getElementById('btnRunAutopilotSetup');
 
     // Clone Modal Elements
     const btnOpenCloneModal = document.getElementById('btnOpenCloneModal');
@@ -1025,6 +1026,9 @@
       btnOpenPublishModal.addEventListener('click', openPublishModal);
       btnCancelPublish.addEventListener('click', closePublishModal);
       btnStartPublish.addEventListener('click', startProjectPublish);
+
+      // Autopilot Setup listener
+      btnRunAutopilotSetup.addEventListener('click', runAutopilotSetup);
     }
 
     // Set connection status
@@ -1407,6 +1411,44 @@
         }
       } catch (err) {
         console.error('Failed to clear logs:', err);
+      }
+    }
+
+    async function runAutopilotSetup() {
+      if (!confirm('Bạn có chắc chắn muốn chạy thiết lập Autopilot?\nThao tác này sẽ mở một cửa sổ Command Prompt mới để cài đặt dịch vụ, cấu hình Git Credential Manager và kiểm tra kết nối.')) {
+        return;
+      }
+      try {
+        const response = await fetch('/api/run-autopilot-setup', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+          alert('Đã kích hoạt trình thiết lập Autopilot! Hãy kiểm tra cửa sổ Command Prompt mới xuất hiện trên màn hình máy tính của bạn.');
+        } else {
+          alert('Không thể chạy thiết lập Autopilot: ' + result.message);
+        }
+      } catch (err) {
+        alert('Lỗi khi chạy thiết lập Autopilot: ' + err.message);
+      }
+    }
+
+    async function runRepoAuth(repoPath) {
+      if (!confirm('Bạn có muốn đăng nhập hoặc sửa quyền ghi cho thư mục repository này?\nThao tác này sẽ mở một cửa sổ Command Prompt mới để thực hiện lệnh "git push" và kích hoạt trình quản lý thông tin đăng nhập Git (Git Credential Manager).')) {
+        return;
+      }
+      try {
+        const response = await fetch('/api/run-repo-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoPath })
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert('Đã mở cửa sổ Command Prompt để đăng nhập Git cho repository. Vui lòng hoàn thành đăng nhập trong cửa sổ lệnh đó.');
+        } else {
+          alert('Không thể mở cửa sổ đăng nhập Git: ' + result.message);
+        }
+      } catch (err) {
+        alert('Lỗi khi đăng nhập Git: ' + err.message);
       }
     }
 
