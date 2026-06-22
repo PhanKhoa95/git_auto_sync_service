@@ -433,6 +433,95 @@ async function performSync(repoPath) {
   }
 }
 
+/**
+ * Performs a pull operation only. Used by periodic synchronization check.
+ */
+async function pullOnly(repoPath) {
+  const repoName = path.basename(repoPath);
+
+  // Serialize execution per repository to avoid index lock conflicts
+  const currentChain = activeSyncs.get(repoPath) || Promise.resolve();
+
+  const nextChain = currentChain.then(async () => {
+    try {
+      if (!fs.existsSync(repoPath)) return;
+      
+      clearStaleGitLocks(repoPath);
+      excludeSymlinks(repoPath);
+
+      let branch = getBranchName(repoPath);
+      if (!branch) {
+        try {
+          const { stdout } = await runGit(repoPath, ['rev-parse', '--abbrev-ref', 'HEAD']);
+          branch = stdout.trim();
+        } catch (err) {
+          logger.error(`[${repoName}] Failed to get branch for periodic pull: ${getErrorMessage(err)}`);
+          return;
+        }
+      }
+
+      if (branch === 'HEAD' || branch.includes('(no branch)')) {
+        return;
+      }
+
+      let hasOrigin = repoRemoteCache.get(repoPath);
+      if (hasOrigin === undefined) {
+        hasOrigin = hasOriginRemote(repoPath);
+        repoRemoteCache.set(repoPath, hasOrigin);
+      }
+
+      if (hasOrigin) {
+        logger.info(`[${repoName}] Checking for remote updates (pulling from origin ${branch})...`);
+        try {
+          const { stdout } = await runGit(repoPath, ['pull', 'origin', branch]);
+          if (stdout.includes('Already up to date.') || stdout.includes('Already up-to-date.')) {
+            // No new remote changes
+          } else {
+            logger.info(`[${repoName}] Pull successful: Remote changes fetched.`);
+            lastSyncTimes.set(repoPath, new Date().toISOString());
+          }
+        } catch (err) {
+          const stderr = (err.stderr || '').toLowerCase();
+          if (stderr.includes("couldn't find remote ref") || stderr.includes("no such ref") || stderr.includes("find remote ref")) {
+            // ignore empty remote refs
+          } else if (stderr.includes("refusing to merge unrelated histories")) {
+            logger.warn(`[${repoName}] Unrelated histories during periodic pull. Retrying pull with --allow-unrelated-histories...`);
+            try {
+              await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
+              logger.info(`[${repoName}] Periodic pull with unrelated histories successful.`);
+              lastSyncTimes.set(repoPath, new Date().toISOString());
+            } catch (retryErr) {
+              const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
+              logger.error(`[${repoName}] Periodic pull with unrelated histories failed: ${getErrorMessage(retryErr)}`);
+              await abortMergeIfNeeded(repoPath, repoName);
+              showNotification(`Git Auto-Sync [${repoName}]`, `Periodic pull failed: ${errDetails}`);
+            }
+          } else {
+            const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
+            logger.error(`[${repoName}] Periodic pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
+            await abortMergeIfNeeded(repoPath, repoName);
+            showNotification(`Git Auto-Sync [${repoName}]`, `Periodic pull failed: ${errDetails}`);
+          }
+        }
+      }
+    } catch (err) {
+      logger.error(`[${repoName}] Unexpected error during periodic pull: ${getErrorMessage(err)}`);
+    }
+  }).catch((err) => {
+    logger.error(`[${repoName}] Critical pull queue error: ${getErrorMessage(err)}`);
+  });
+
+  activeSyncs.set(repoPath, nextChain);
+
+  nextChain.then(() => {
+    if (activeSyncs.get(repoPath) === nextChain) {
+      activeSyncs.delete(repoPath);
+    }
+  });
+
+  return nextChain;
+}
+
 function clearRepositoryCache(repoPath) {
   activeSyncs.delete(repoPath);
   repoRemoteCache.delete(repoPath);
@@ -444,6 +533,7 @@ module.exports = {
   runGit,
   getRemoteOriginUrl,
   getLastSyncTime,
-  clearRepositoryCache
+  clearRepositoryCache,
+  pullOnly
 };
 
