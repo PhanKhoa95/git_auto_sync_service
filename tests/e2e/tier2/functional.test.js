@@ -577,6 +577,7 @@ describe('Tier 2 Detailed Functional Tests', function () {
     expect(res.status).to.equal(0);
   });
 
+  // Inserted tests for deep scanning and direct repo path monitoring
   // TC-T2-25: Verify verify_sync.ps1 cleanup
   it('TC-T2-25: Verify verify_sync.ps1 cleanup', function () {
     const verifyScriptPath = path.resolve(__dirname, '../../../verify_sync.ps1');
@@ -594,5 +595,42 @@ describe('Tier 2 Detailed Functional Tests', function () {
     const files = fs.readdirSync(path.resolve(__dirname, '../../..'));
     const tempRepos = files.filter((f) => f.includes('verify_sync_temp_'));
     expect(tempRepos.length).to.equal(0);
+  });
+
+  // TC-T2-30: Scan recursively up to configured maxScanDepth
+  it('TC-T2-30: Scan recursively up to configured maxScanDepth', async () => {
+    // Create nested directory tree: level1/level2/level3_repo
+    const level1Path = path.join(harness.virtualDrivePath, 'level1');
+    const level2Path = path.join(level1Path, 'level2');
+    fs.mkdirSync(level2Path, { recursive: true });
+
+    // level3_repo is at depth 3 from virtualDrivePath (monitoredRoot)
+    harness.createMockRepo('level1/level2/level3_repo', true);
+
+    // Start daemon with MAX_SCAN_DEPTH = 3
+    harness.startDaemon({ DEBOUNCE_DELAY: '500', MAX_SCAN_DEPTH: '3' });
+    await harness.waitForDaemonReady();
+
+    // Verify it is watched and we can sync it
+    harness.createFile('level1/level2/level3_repo', 'nested_depth3.txt', 'nested file depth 3');
+    const remotePath = path.join(harness.remotesPath, 'level1/level2/level3_repo.git');
+    const files = await waitForRemoteFile(remotePath, 'master', 'nested_depth3.txt');
+    expect(files).to.include('nested_depth3.txt');
+  });
+
+  // TC-T2-31: Watch specific Git repository directly configured in monitoredRoots
+  it('TC-T2-31: Watch specific Git repository directly configured in monitoredRoots', async () => {
+    // Create a repo outside the standard root folder
+    const directRepoPath = harness.createMockRepo('outside_projects/repo_direct', true);
+
+    // Start daemon with directRepoPath as the monitored baseDir
+    harness.startDaemon({ TEST_E_DRIVE_PATH: directRepoPath, DEBOUNCE_DELAY: '500' });
+    await harness.waitForDaemonReady();
+
+    // Verify it is watched and we can sync it
+    harness.createFile('outside_projects/repo_direct', 'direct_sync.txt', 'direct content');
+    const remotePath = path.join(harness.remotesPath, 'outside_projects/repo_direct.git');
+    const files = await waitForRemoteFile(remotePath, 'master', 'direct_sync.txt');
+    expect(files).to.include('direct_sync.txt');
   });
 });
