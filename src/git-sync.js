@@ -2,6 +2,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
+const { showNotification } = require('./notifier');
 const { registerChildProcess } = require('./child-process-registry');
 
 function getErrorMessage(err) {
@@ -309,13 +310,17 @@ async function performSync(repoPath) {
             await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
             logger.info(`[${repoName}] Pull with unrelated histories successful.`);
           } catch (retryErr) {
+            const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
             logger.error(`[${repoName}] Pull with unrelated histories failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
+            showNotification(`Git Auto-Sync [${repoName}]`, `Pull failed: ${errDetails}`);
             return;
           }
         } else {
+          const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
           logger.error(`[${repoName}] Pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
           await abortMergeIfNeeded(repoPath, repoName);
+          showNotification(`Git Auto-Sync [${repoName}]`, `Pull failed: ${errDetails}`);
           logger.warn(`[${repoName}] Skipping remainder of synchronization cycle to prevent conflict compounding.`);
           return;
         }
@@ -366,10 +371,12 @@ async function performSync(repoPath) {
           logger.info(`[${repoName}] Commit successful after identity self-fixing.`);
         } catch (retryErr) {
           logger.error(`[${repoName}] Commit failed after identity self-fixing attempt: ${getErrorMessage(retryErr)}`);
+          showNotification(`Git Auto-Sync [${repoName}]`, `Commit failed: User identity not configured.`);
           return;
         }
       } else {
         logger.error(`[${repoName}] Commit failed: ${getErrorMessage(err)}`);
+        showNotification(`Git Auto-Sync [${repoName}]`, `Commit failed: ${getErrorMessage(err)}`);
         return;
       }
     }
@@ -400,12 +407,16 @@ async function performSync(repoPath) {
             await runGit(repoPath, ['push', 'origin', branch]);
             logger.info(`[${repoName}] Push successful after retrying.`);
           } catch (retryErr) {
+            const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
             logger.error(`[${repoName}] Pull/push recovery failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
+            showNotification(`Git Auto-Sync [${repoName}]`, `Push rejected. Recovery failed: ${errDetails}`);
             return;
           }
         } else {
+          const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
           logger.error(`[${repoName}] Push failed: ${getErrorMessage(err)}. Output: ${err.stderr.trim()}`);
+          showNotification(`Git Auto-Sync [${repoName}]`, `Push failed: ${errDetails}`);
           return;
         }
       }
