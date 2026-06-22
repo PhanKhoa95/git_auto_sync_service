@@ -217,9 +217,32 @@ echo.
 pause
 goto MENU
 
+:CLEAR_GCM
+echo.
+echo === [7] ĐĂNG XUẤT / XÓA TÀI KHOẢN GITHUB ĐANG LƯU ===
+echo.
+echo Đang xóa các thông tin đăng nhập Github cũ đã lưu trong Windows Credential Manager...
+:: 1. Delete target target=git:https://github.com
+cmdkey /delete:LegacyGeneric:target=git:https://github.com >nul 2>&1
+:: 2. Delete GCM system-wide entry target if it exists
+cmdkey /list | findstr /i "git:https://github.com" >temp_gkeys.txt
+for /f "tokens=2 delims==" %%g in ('findstr /i "LegacyGeneric:" temp_gkeys.txt 2^>nul') do (
+    cmdkey /delete:%%g >nul 2>&1
+)
+del temp_gkeys.txt >nul 2>&1
+:: 3. Run git credential reject
+powershell -NoProfile -ExecutionPolicy Bypass -Command "@('protocol=https', 'host=github.com', '') | git credential reject"
+echo.
+echo [+] Đã xóa thành công thông tin tài khoản Github cũ (ví dụ: khoap1220-hue).
+echo [+] Lần sau khi bạn thực hiện 'git push' hoặc chạy Tùy chọn 6,
+echo     Git sẽ hiển thị cửa sổ để bạn đăng nhập lại bằng tài khoản mới (phankhoa95).
+echo.
+pause
+goto MENU
+
 :VIEW_LOGS
 echo.
-echo === [7] XEM NHẬT KÝ HOẠT ĐỘNG ===
+echo === [8] XEM NHẬT KÝ HOẠT ĐỘNG ===
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "^
 $logPath = 'E:\git_auto_sync_service\sync.log';^
