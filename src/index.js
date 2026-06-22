@@ -532,9 +532,50 @@ function startServer(port) {
         try {
           const parsed = JSON.parse(body);
           if (!parsed.repoPath) throw new Error('Missing repoPath.');
-          const { exec } = require('child_process');
+          const { exec, execSync } = require('child_process');
+          // Reject existing credentials so that the push prompt immediately asks for new ones
+          try {
+            execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "@('protocol=https', 'host=github.com', '') | git credential reject"`, { stdio: 'ignore' });
+          } catch (err) {}
+          
           const escapedPath = parsed.repoPath.replace(/"/g, '""');
           exec(`cmd.exe /c start cmd.exe /k "cd /d ^"${escapedPath}^" && git push"`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
+    } else if (req.method === 'POST' && reqPath === '/api/add-safe-directory') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.repoPath) throw new Error('Missing repoPath.');
+          const { execSync } = require('child_process');
+          const resolvedPath = path.resolve(parsed.repoPath).replace(/\\/g, '/');
+          execSync(`git config --global --add safe.directory "${resolvedPath}"`, { stdio: 'pipe' });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
+    } else if (req.method === 'POST' && reqPath === '/api/set-git-identity') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.repoPath || !parsed.name || !parsed.email) {
+            throw new Error('Missing repoPath, name or email.');
+          }
+          const { execSync } = require('child_process');
+          execSync(`git config --global user.name "${parsed.name.replace(/"/g, '\\"')}"`, { stdio: 'pipe' });
+          execSync(`git config --global user.email "${parsed.email.replace(/"/g, '\\"')}"`, { stdio: 'pipe' });
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
         } catch (e) {
