@@ -1,22 +1,18 @@
-# Set console output encoding to UTF-8
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-[Console]::InputEncoding = [System.Text.Encoding]::UTF8
-
 function Show-Menu {
     Clear-Host
     Write-Host "==================================================" -ForegroundColor Cyan
-    Write-Host "      Trình Khắc Phục Sự Cố Git Auto-Sync (Autopilot)" -ForegroundColor Cyan
+    Write-Host "      Trinh Khac Phuc Su Co Git Auto-Sync (Autopilot)" -ForegroundColor Cyan
     Write-Host "==================================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "[1] Kiểm tra trạng thái dịch vụ (Daemon Status)"
-    Write-Host "[2] Kiểm tra kết nối mạng (Internet & GitHub)"
-    Write-Host "[3] Kiểm tra & Cấu hình danh tính Git (User Name/Email)"
-    Write-Host "[4] Kiểm tra & Bật Trình quản lý Đăng nhập (GCM Helper)"
-    Write-Host "[5] Kiểm tra & Sửa quyền bảo mật thư mục (safe.directory)"
-    Write-Host "[6] Thử kết nối từ xa & Đăng nhập (Git Push dry-run)"
-    Write-Host "[7] Đăng xuất / Xóa tài khoản GitHub đang lưu (Sign out)"
-    Write-Host "[8] Xem nhật ký hoạt động (15 dòng log gần nhất)"
-    Write-Host "[9] Thoát"
+    Write-Host "[1] Kiem tra trang thai dich vu (Daemon Status)"
+    Write-Host "[2] Kiem tra ket noi mang (Internet & GitHub)"
+    Write-Host "[3] Kiem tra & Cau hinh danh tinh Git (User Name/Email)"
+    Write-Host "[4] Kiem tra & Bat Trinh quan ly Dang nhap (GCM Helper)"
+    Write-Host "[5] Kiem tra & Sua quyen bao mat thu muc (safe.directory)"
+    Write-Host "[6] Thu ket noi tu xa & Dang nhap (Git Push dry-run)"
+    Write-Host "[7] Dang xuat / Xoa tai khoan GitHub dang luu (Sign out)"
+    Write-Host "[8] Xem nhat ky hoat dong (15 dong log gan nhat)"
+    Write-Host "[9] Thoat"
     Write-Host ""
     Write-Host "==================================================" -ForegroundColor Cyan
 }
@@ -24,17 +20,16 @@ function Show-Menu {
 $choice = ""
 while ($choice -ne "9") {
     Show-Menu
-    $choice = Read-Host "Chọn một tùy chọn (1-9)"
+    $choice = Read-Host "Chon mot tuy chon (1-9)"
     
     switch ($choice) {
         "1" {
-            Write-Host "`n=== [1] KIỂM TRA TRẠNG THÁI DỊCH VỤ ===" -ForegroundColor Yellow
-            # Check port 9999
+            Write-Host "`n=== [1] KIEM TRA TRANG THAI DICH VU ===" -ForegroundColor Yellow
             $netstat = netstat -ano | Select-String "9999" | Select-String "LISTENING"
             if ($netstat) {
-                Write-Host "[+] Dịch vụ Web Dashboard đang chạy trên cổng 9999." -ForegroundColor Green
+                Write-Host "[+] Dich vu Web Dashboard dang chay tren cong 9999." -ForegroundColor Green
             } else {
-                Write-Host "[!] Dịch vụ Web Dashboard (cổng 9999) đang TẮT." -ForegroundColor Red
+                Write-Host "[!] Dich vu Web Dashboard (cong 9999) dang TAT." -ForegroundColor Red
             }
             
             $configPath = Join-Path $PSScriptRoot "config.json"
@@ -46,83 +41,83 @@ while ($choice -ne "9") {
                     $lockFile = Join-Path $r ".sync.lock"
                     if (Test-Path $lockFile) {
                         $pid = (Get-Content $lockFile).Trim()
-                        Write-Host "[+] Tìm thấy file khóa tại $lockFile với PID $pid."
+                        Write-Host "[+] Tim thay file khoa tai $lockFile voi PID $pid."
                         $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
                         if ($proc) {
-                            Write-Host "[+] Dịch vụ Daemon (PID $pid) đang HOẠT ĐỘNG thực tế." -ForegroundColor Green
+                            Write-Host "[+] Dich vu Daemon (PID $pid) dang HOAT DONG thuc te." -ForegroundColor Green
                         } else {
-                            Write-Host "[!] File khóa tồn tại nhưng tiến trình (PID $pid) đã BỊ TẮT hoặc chết lâm sàng." -ForegroundColor Red
+                            Write-Host "[!] File khoa ton tai nhung tien trinh (PID $pid) da BI TAT." -ForegroundColor Red
                         }
                     } else {
-                        Write-Host "[!] Không tìm thấy file khóa tại $r." -ForegroundColor Red
+                        Write-Host "[!] Khong tim thay file khoa tai $r." -ForegroundColor Red
                     }
                 }
             } else {
-                Write-Host "[!] Không tìm thấy file config.json ở thư mục gốc." -ForegroundColor Red
+                Write-Host "[!] Khong tim thay file config.json." -ForegroundColor Red
             }
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "2" {
-            Write-Host "`n=== [2] KIỂM TRA KẾT NỐI MẠNG ===" -ForegroundColor Yellow
-            Write-Host "Đang gửi gói tin kiểm tra kết nối tới github.com..."
+            Write-Host "`n=== [2] KIEM TRA KET NOI MANG ===" -ForegroundColor Yellow
+            Write-Host "Dang gui goi tin kiem tra ket noi toi github.com..."
             $ping = Test-Connection -ComputerName github.com -Count 3 -Quiet -ErrorAction SilentlyContinue
             if ($ping) {
-                Write-Host "[+] Kết nối Internet và GitHub tốt." -ForegroundColor Green
+                Write-Host "[+] Ket noi Internet va GitHub tot." -ForegroundColor Green
             } else {
-                Write-Host "[!] KHÔNG THỂ kết nối tới github.com. Vui lòng kiểm tra lại đường truyền mạng của bạn." -ForegroundColor Red
+                Write-Host "[!] KHONG THE ket noi toi github.com. Vui lau kiem tra lai duong truyen mang." -ForegroundColor Red
             }
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "3" {
-            Write-Host "`n=== [3] KIỂM TRA & CẤU HÌNH DANH TÍNH GIT ===" -ForegroundColor Yellow
+            Write-Host "`n=== [3] KIEM TRA & CAU HINH DANH TINH GIT ===" -ForegroundColor Yellow
             $name = git config --global user.name
             $email = git config --global user.email
-            Write-Host "Danh tính Git hiện tại:"
-            Write-Host "  - Tên người dùng: $(if ($name) { $name } else { '[CHƯA CẤU HÌNH]' })"
-            Write-Host "  - Email:          $(if ($email) { $email } else { '[CHƯA CẤU HÌNH]' })"
+            Write-Host "Danh tinh Git hien tai:"
+            Write-Host "  - Ten nguoi dung: $(if ($name) { $name } else { '[CHUA CAU HINH]' })"
+            Write-Host "  - Email:          $(if ($email) { $email } else { '[CHUA CAU HINH]' })"
             Write-Host ""
-            $ans = Read-Host "Bạn có muốn cấu hình / thay đổi thông tin này không? (Y/N)"
+            $ans = Read-Host "Ban co muon cau hinh / thay doi thong tin nay khong? (Y/N)"
             if ($ans -eq 'Y' -or $ans -eq 'y') {
-                $newName = Read-Host "Nhập Git User Name mới"
-                $newEmail = Read-Host "Nhập Git Email mới"
+                $newName = Read-Host "Nhap Git User Name moi"
+                $newEmail = Read-Host "Nhap Git Email moi"
                 if ($newName) {
                     git config --global user.name $newName
                 }
                 if ($newEmail) {
                     git config --global user.email $newEmail
                 }
-                Write-Host "[+] Cập nhật cấu hình Git thành công!" -ForegroundColor Green
+                Write-Host "[+] Cap nhat cau hinh Git thanh cong!" -ForegroundColor Green
             }
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "4" {
-            Write-Host "`n=== [4] KIỂM TRA & BẬT TRÌNH QUẢN LÝ ĐĂNG NHẬP ===" -ForegroundColor Yellow
+            Write-Host "`n=== [4] KIEM TRA & BAT TRINH QUAN LY DANG NHAP ===" -ForegroundColor Yellow
             $gcm = git config --global credential.helper
-            Write-Host "Trình quản lý đăng nhập hiện tại: $(if ($gcm) { $gcm } else { '(Chưa có)' })"
+            Write-Host "Trinh quan ly dang nhap hien tai: $(if ($gcm) { $gcm } else { '(Chua co)' })"
             if ($gcm -ne 'manager') {
-                Write-Host "[!] Git Credential Manager (GCM) chưa được bật hoặc dùng giá trị khác." -ForegroundColor Red
-                $ans = Read-Host "Bạn có muốn kích hoạt Git Credential Manager (manager) không? (Y/N)"
+                Write-Host "[!] Git Credential Manager (GCM) chua duoc bat." -ForegroundColor Red
+                $ans = Read-Host "Ban co muon kich hoat Git Credential Manager (manager) khong? (Y/N)"
                 if ($ans -eq 'Y' -or $ans -eq 'y') {
                     git config --global credential.helper manager
-                    Write-Host "[+] Đã kích hoạt thành công Git Credential Manager toàn cục." -ForegroundColor Green
+                    Write-Host "[+] Da kich hoat thanh cong Git Credential Manager toan cuc." -ForegroundColor Green
                 }
             } else {
-                Write-Host "[+] Git Credential Manager đã được cấu hình chính xác (credential.helper = manager)." -ForegroundColor Green
+                Write-Host "[+] Git Credential Manager da duoc cau hinh chinh xac." -ForegroundColor Green
             }
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "5" {
-            Write-Host "`n=== [5] KIỂM TRA & SỬA QUYỀN BẢO MẬT THƯ MỤC ===" -ForegroundColor Yellow
+            Write-Host "`n=== [5] KIEM TRA & SUA QUYEN BAO MAT THU MUC ===" -ForegroundColor Yellow
             $safeDirs = git config --global --get-all safe.directory 2>$null
-            Write-Host "Danh sách safe.directory hiện tại:"
+            Write-Host "Danh sach safe.directory hien tai:"
             if ($safeDirs) {
                 foreach ($d in $safeDirs) { Write-Host "  - $d" }
             } else {
-                Write-Host "  (Trống)"
+                Write-Host "  (Trong)"
             }
             $configPath = Join-Path $PSScriptRoot "config.json"
             if (Test-Path $configPath) {
@@ -130,7 +125,7 @@ while ($choice -ne "9") {
                 $roots = $cfg.monitoredRoots
                 foreach ($r in $roots) {
                     $resolved = (Resolve-Path $r).Path.Replace('\','/')
-                    Write-Host "`nĐang kiểm tra bảo mật thư mục: $resolved"
+                    Write-Host "`nDang kiem tra bao mat thu muc: $resolved"
                     $isSafe = $false
                     if ($safeDirs) {
                         foreach ($sd in $safeDirs) {
@@ -138,26 +133,26 @@ while ($choice -ne "9") {
                         }
                     }
                     if ($isSafe) {
-                        Write-Host "[+] Thư mục $r đã an toàn." -ForegroundColor Green
+                        Write-Host "[+] Thu muc $r da an toan." -ForegroundColor Green
                     } else {
-                        Write-Host "[!] Thư mục $r CHƯA được thêm vào safe.directory của Git." -ForegroundColor Red
-                        $ans = Read-Host "Bạn có muốn thêm thư mục này vào danh sách an toàn không? (Y/N)"
+                        Write-Host "[!] Thu muc $r CHUA duoc them vao safe.directory cua Git." -ForegroundColor Red
+                        $ans = Read-Host "Ban co muon them thu muc nay vao danh sach an toan khong? (Y/N)"
                         if ($ans -eq 'Y' -or $ans -eq 'y') {
                             git config --global --add safe.directory $resolved
-                            Write-Host "[+] Đã thêm $resolved vào safe.directory." -ForegroundColor Green
+                            Write-Host "[+] Da them $resolved vao safe.directory." -ForegroundColor Green
                         }
                     }
                 }
             } else {
-                Write-Host "[!] Không tìm thấy file config.json." -ForegroundColor Red
+                Write-Host "[!] Khong tim thay file config.json." -ForegroundColor Red
             }
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "6" {
-            Write-Host "`n=== [6] THỬ KẾT NỐI TỪ XA & ĐĂNG NHẬP ===" -ForegroundColor Yellow
-            Write-Host "Thao tác này sẽ chạy thử lệnh 'git push --dry-run' để kiểm tra kết nối từ xa."
-            Write-Host "Nếu thông tin đăng nhập hết hạn hoặc chưa lưu, hộp thoại xác thực của Git sẽ xuất hiện."
+            Write-Host "`n=== [6] THU KET NOI TU XA & DANG NHAP ===" -ForegroundColor Yellow
+            Write-Host "Thao tac nay se chay thu lenh 'git push --dry-run' de kiem tra."
+            Write-Host "Neu thong tin dang nhap het han, hop thoai xac thuc se xuat hien."
             Write-Host ""
             $configPath = Join-Path $PSScriptRoot "config.json"
             if (Test-Path $configPath) {
@@ -166,33 +161,37 @@ while ($choice -ne "9") {
                 foreach ($r in $roots) {
                     if (Test-Path (Join-Path $r ".git")) {
                         Write-Host "`n==================================================" -ForegroundColor Cyan
-                        Write-Host "Kiểm tra Repo: $r"
-                        $remotes = Invoke-Expression "cmd.exe /c 'cd /d `"$r`" && git remote -v'"
+                        Write-Host "Kiem tra Repo: $r"
+                        
+                        # Use Set-Location / native git instead of Invoke-Expression / cmd
+                        $oldLocation = Get-Location
+                        Set-Location $r
+                        $remotes = git remote -v
                         if (-not $remotes) {
-                            Write-Host "[!] Repository này chưa cấu hình remote origin. Bỏ qua." -ForegroundColor Red
+                            Write-Host "[!] Repository nay chua cau hinh remote origin. Bo qua." -ForegroundColor Red
+                            Set-Location $oldLocation
                             continue
                         }
-                        Write-Host "Đang thực hiện chạy thử Git Push..."
-                        cmd.exe /c "cd /d `"$r`" && git push --dry-run origin 2>&1"
+                        Write-Host "Dang thuc hien chay thu Git Push..."
+                        git push --dry-run origin 2>&1
                         if ($LASTEXITCODE -eq 0) {
-                            Write-Host "[+] Kết nối và xác thực tới Remote thành công!" -ForegroundColor Green
+                            Write-Host "[+] Ket noi va xac thuc toi Remote thanh cong!" -ForegroundColor Green
                         } else {
-                            Write-Host "[!] Thử push thất bại. Có thể cần đăng nhập hoặc sửa quyền ghi." -ForegroundColor Red
+                            Write-Host "[!] Thu push that bai. Co the can dang nhap hoac sua quyen ghi." -ForegroundColor Red
                         }
+                        Set-Location $oldLocation
                     }
                 }
             } else {
-                Write-Host "[!] Không tìm thấy file config.json." -ForegroundColor Red
+                Write-Host "[!] Khong tim thay file config.json." -ForegroundColor Red
             }
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "7" {
-            Write-Host "`n=== [7] ĐĂNG XUẤT / XÓA TÀI KHOẢN GITHUB ĐANG LƯU ===" -ForegroundColor Yellow
-            Write-Host "Đang xóa các thông tin đăng nhập Github cũ đã lưu..."
-            # 1. Delete target target=git:https://github.com
+            Write-Host "`n=== [7] DANG XUAT / XOA TAI KHOAN GITHUB DANG LUU ===" -ForegroundColor Yellow
+            Write-Host "Dang xoa cac thong tin dang nhap Github cu..."
             cmdkey /delete:LegacyGeneric:target=git:https://github.com 2>$null | Out-Null
-            # 2. Delete GCM targets matching git:https://github.com
             $gkeys = cmdkey /list | Select-String "git:https://github.com"
             foreach ($gk in $gkeys) {
                 if ($gk -match "target=(LegacyGeneric:.*?)$") {
@@ -200,31 +199,30 @@ while ($choice -ne "9") {
                     cmdkey /delete:$target 2>$null | Out-Null
                 }
             }
-            # 3. Reject git credentials
             @("protocol=https", "host=github.com", "") | git credential reject
-            Write-Host "[+] Đã xóa thành công thông tin tài khoản Github cũ (ví dụ: khoap1220-hue)." -ForegroundColor Green
-            Write-Host "[+] Lần sau khi bạn thực hiện 'git push' hoặc chạy Tùy chọn 6,"
-            Write-Host "    Git sẽ hiển thị cửa sổ để bạn đăng nhập lại bằng tài khoản mới."
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "[+] Da xoa thanh cong thong tin tai khoan Github cu." -ForegroundColor Green
+            Write-Host "[+] Lan sau khi thuc hien 'git push' hoac Option 6,"
+            Write-Host "    Git se hien thi cua so de dang nhap lai bang tai khoan moi."
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "8" {
-            Write-Host "`n=== [8] XEM NHẬT KÝ HOẠT ĐỘNG ===" -ForegroundColor Yellow
+            Write-Host "`n=== [8] XEM NHAT KY HOAT DONG ===" -ForegroundColor Yellow
             $logPath = "E:\git_auto_sync_service\sync.log"
             if (-not (Test-Path $logPath)) {
                 $logPath = Join-Path $PSScriptRoot "sync.log"
             }
             if (Test-Path $logPath) {
-                Write-Host "15 dòng nhật ký hoạt động gần nhất từ $logPath:`n"
+                Write-Host "15 dong nhat ky hoat dong gan nhat tu $logPath:`n"
                 Get-Content $logPath -Tail 15
             } else {
-                Write-Host "[!] Không tìm thấy tệp nhật ký sync.log." -ForegroundColor Red
+                Write-Host "[!] Khong tim thay tep nhat ky sync.log." -ForegroundColor Red
             }
-            Write-Host "`nNhấn Enter để tiếp tục..."
-            Read-Host
+            Write-Host "`nNhan Enter de tiep tuc..."
+            Read-Host | Out-Null
         }
         "9" {
-            Write-Host "`nCảm ơn bạn đã sử dụng Trình Khắc Phục Sự Cố Git Auto-Sync." -ForegroundColor Green
+            Write-Host "`nCam on ban da su dung Trinh Khac Phuc Su Co." -ForegroundColor Green
         }
     }
 }
