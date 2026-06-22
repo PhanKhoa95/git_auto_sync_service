@@ -7,6 +7,7 @@ const { getConfig } = require('./config-manager');
 const watchers = new Map();      // repoPath -> FSWatcher instance
 const debounceTimers = new Map(); // repoPath -> setTimeout ID
 let scanInterval = null;
+let pullInterval = null;
 let lastScanTime = Date.now();
 
 /**
@@ -262,6 +263,21 @@ function stopWatchingRepo(repoPath) {
 }
 
 /**
+ * Triggers a pullOnly sync cycle on all currently watched repositories.
+ */
+async function triggerPeriodicRemotePull() {
+  logger.info(`Running periodic remote pull check on watched repositories...`);
+  const { pullOnly } = require('./git-sync');
+  for (const repoPath of watchers.keys()) {
+    try {
+      await pullOnly(repoPath);
+    } catch (err) {
+      logger.error(`[${path.basename(repoPath)}] Periodic pull failed: ${err.message}`);
+    }
+  }
+}
+
+/**
  * Scans and starts watching detected Git repositories, and runs periodic scan.
  */
 function watchRepositories(baseDir) {
@@ -273,7 +289,8 @@ function watchRepositories(baseDir) {
     }
   }
 
-  const roots = getConfig().monitoredRoots;
+  const config = getConfig();
+  const roots = config.monitoredRoots;
   logger.info(`Initializing repo watcher on roots: ${roots.join(', ')}`);
   lastScanTime = Date.now();
   
@@ -287,6 +304,13 @@ function watchRepositories(baseDir) {
     await updateWatchers().catch(err => logger.error(`Periodic scan failed: ${err.message}`));
   }, 30000);
 
+  // Start periodic pull interval
+  const pullIntervalMs = config.remotePullIntervalMs !== undefined ? config.remotePullIntervalMs : 300000;
+  if (pullIntervalMs > 0) {
+    logger.info(`Starting periodic remote pull interval: every ${pullIntervalMs / 1000}s`);
+    pullInterval = setInterval(triggerPeriodicRemotePull, pullIntervalMs);
+  }
+
   return watchers;
 }
 
@@ -298,6 +322,10 @@ function stopWatching() {
   if (scanInterval) {
     clearInterval(scanInterval);
     scanInterval = null;
+  }
+  if (pullInterval) {
+    clearInterval(pullInterval);
+    pullInterval = null;
   }
   stopAllWatchersOnly();
 }
@@ -315,7 +343,18 @@ function stopAllWatchersOnly() {
 function reloadWatcher() {
   logger.info('Reloading repository watchers dynamically...');
   stopAllWatchersOnly();
+  if (pullInterval) {
+    clearInterval(pullInterval);
+    pullInterval = null;
+  }
   updateWatchers().catch(err => logger.error(`Reload scan failed: ${err.message}`));
+  
+  const config = getConfig();
+  const pullIntervalMs = config.remotePullIntervalMs !== undefined ? config.remotePullIntervalMs : 300000;
+  if (pullIntervalMs > 0) {
+    logger.info(`Restarting periodic remote pull interval: every ${pullIntervalMs / 1000}s`);
+    pullInterval = setInterval(triggerPeriodicRemotePull, pullIntervalMs);
+  }
 }
 
 function getWatchedRepositoriesMetadata() {
