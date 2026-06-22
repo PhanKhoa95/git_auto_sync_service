@@ -213,7 +213,7 @@ while ($choice -ne "9") {
                 $logPath = Join-Path $PSScriptRoot "sync.log"
             }
             if (Test-Path $logPath) {
-                Write-Host "15 dong nhat ky hoat dong gan nhat tu $logPath:`n"
+                Write-Host "15 dong nhat ky hoat dong gan nhat tu ${logPath}:`n"
                 Get-Content $logPath -Tail 15
             } else {
                 Write-Host "[!] Khong tim thay tep nhat ky sync.log." -ForegroundColor Red
