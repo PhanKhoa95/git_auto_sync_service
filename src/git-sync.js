@@ -414,13 +414,13 @@ async function performSync(repoPath) {
             const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
             logger.error(`[${repoName}] Pull/push recovery failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
-            showNotification(`Git Auto-Sync [${repoName}]`, `Push rejected. Recovery failed: ${errDetails}`);
+            showGitErrorNotification(repoName, 'đẩy thay đổi (push)', errDetails);
             return;
           }
         } else {
           const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
           logger.error(`[${repoName}] Push failed: ${getErrorMessage(err)}. Output: ${err.stderr.trim()}`);
-          showNotification(`Git Auto-Sync [${repoName}]`, `Push failed: ${errDetails}`);
+          showGitErrorNotification(repoName, 'đẩy thay đổi (push)', errDetails);
           return;
         }
       }
@@ -494,13 +494,13 @@ async function pullOnly(repoPath) {
               const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
               logger.error(`[${repoName}] Periodic pull with unrelated histories failed: ${getErrorMessage(retryErr)}`);
               await abortMergeIfNeeded(repoPath, repoName);
-              showNotification(`Git Auto-Sync [${repoName}]`, `Periodic pull failed: ${errDetails}`);
+              showGitErrorNotification(repoName, 'cập nhật tự động (pull)', errDetails);
             }
           } else {
             const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
             logger.error(`[${repoName}] Periodic pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
             await abortMergeIfNeeded(repoPath, repoName);
-            showNotification(`Git Auto-Sync [${repoName}]`, `Periodic pull failed: ${errDetails}`);
+            showGitErrorNotification(repoName, 'cập nhật tự động (pull)', errDetails);
           }
         }
       }
