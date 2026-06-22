@@ -2,7 +2,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
-const { showNotification, showGitErrorNotification, showGitSuccessNotification } = require('./notifier');
+const { showNotification, showGitErrorNotification, showGitSuccessNotification, parseFriendlyGitError } = require('./notifier');
 const { registerChildProcess } = require('./child-process-registry');
 
 function getErrorMessage(err) {
@@ -18,9 +18,20 @@ function getErrorMessage(err) {
 }
 
 const lastSyncTimes = new Map(); // repoPath -> ISOString
+const lastSyncErrors = new Map(); // repoPath -> String
 
 function getLastSyncTime(repoPath) {
   return lastSyncTimes.get(repoPath) || null;
+}
+
+function getLastSyncError(repoPath) {
+  return lastSyncErrors.get(repoPath) || null;
+}
+
+function reportGitError(repoPath, repoName, action, rawError) {
+  const { message } = parseFriendlyGitError(action, rawError);
+  lastSyncErrors.set(repoPath, message);
+  showGitErrorNotification(repoName, action, rawError);
 }
 
 /**
@@ -533,6 +544,7 @@ function clearRepositoryCache(repoPath) {
   activeSyncs.delete(repoPath);
   repoRemoteCache.delete(repoPath);
   lastSyncTimes.delete(repoPath);
+  lastSyncErrors.delete(repoPath);
 }
 
 module.exports = {
@@ -540,6 +552,7 @@ module.exports = {
   runGit,
   getRemoteOriginUrl,
   getLastSyncTime,
+  getLastSyncError,
   clearRepositoryCache,
   pullOnly
 };
