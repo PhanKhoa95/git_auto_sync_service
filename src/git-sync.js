@@ -394,6 +394,7 @@ async function performSync(repoPath) {
       try {
         await runGit(repoPath, ['push', 'origin', branch]);
         logger.info(`[${repoName}] Push successful.`);
+        showGitSuccessNotification(repoName, 'push');
       } catch (err) {
         const stderr = (err.stderr || '').toLowerCase();
         if (stderr.includes('non-fast-forward') || stderr.includes('updates were rejected') || stderr.includes('fetch first')) {
@@ -413,6 +414,7 @@ async function performSync(repoPath) {
             logger.info(`[${repoName}] Pull successful. Re-trying push...`);
             await runGit(repoPath, ['push', 'origin', branch]);
             logger.info(`[${repoName}] Push successful after retrying.`);
+            showGitSuccessNotification(repoName, 'push');
           } catch (retryErr) {
             const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
             logger.error(`[${repoName}] Pull/push recovery failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
@@ -482,6 +484,7 @@ async function pullOnly(repoPath) {
           } else {
             logger.info(`[${repoName}] Pull successful: Remote changes fetched.`);
             lastSyncTimes.set(repoPath, new Date().toISOString());
+            showGitSuccessNotification(repoName, 'pull');
           }
         } catch (err) {
           const stderr = (err.stderr || '').toLowerCase();
@@ -493,6 +496,7 @@ async function pullOnly(repoPath) {
               await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
               logger.info(`[${repoName}] Periodic pull with unrelated histories successful.`);
               lastSyncTimes.set(repoPath, new Date().toISOString());
+              showGitSuccessNotification(repoName, 'pull');
             } catch (retryErr) {
               const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
               logger.error(`[${repoName}] Periodic pull with unrelated histories failed: ${getErrorMessage(retryErr)}`);
