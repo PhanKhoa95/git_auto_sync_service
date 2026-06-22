@@ -503,6 +503,34 @@ function startServer(port) {
           res.end(JSON.stringify({ success: false, message: e.message }));
         }
       });
+    } else if (req.method === 'POST' && reqPath === '/api/run-autopilot-setup') {
+      try {
+        const { exec } = require('child_process');
+        const projectRoot = path.resolve(__dirname, '..');
+        exec(`cmd.exe /c start setup.bat`, { cwd: projectRoot });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, message: e.message }));
+      }
+    } else if (req.method === 'POST' && reqPath === '/api/run-repo-auth') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.repoPath) throw new Error('Missing repoPath.');
+          const { exec } = require('child_process');
+          const escapedPath = parsed.repoPath.replace(/"/g, '""');
+          exec(`cmd.exe /c start cmd.exe /k "cd /d ^"${escapedPath}^" && git push"`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
     } else if (req.method === 'POST' && reqPath === '/api/set-remote') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
