@@ -1,7 +1,8 @@
 {
   "debounceDelayMs": 10000,
   "monitoredRoots": [
-    "L:\\"
+    "L:\\git_auto_sync_service",
+    "G:\\QTDN"
   ],
   "ignoredPatterns": [
     ".git",
