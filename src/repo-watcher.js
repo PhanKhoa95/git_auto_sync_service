@@ -282,7 +282,8 @@ async function triggerPeriodicRemotePull() {
  */
 function watchRepositories(baseDir) {
   // If baseDir is provided as a single string (from legacy/test setups), ensure it is in monitoredRoots
-  if (baseDir) {
+  // Only override when running in test mode or if explicitly defined via test environment variables
+  if (baseDir && (process.env.NODE_ENV === 'test' || process.env.TEST_E_DRIVE_PATH)) {
     const config = getConfig();
     if (!config.monitoredRoots.includes(baseDir)) {
       config.monitoredRoots = [baseDir];

@@ -2,6 +2,23 @@ const { spawn } = require('child_process');
 const logger = require('./logger');
 
 /**
+ * Escapes unsafe XML characters.
+ */
+function escapeXml(unsafe) {
+  if (typeof unsafe !== 'string') return '';
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
+  });
+}
+
+/**
  * Shows a Windows Toast Notification by executing a PowerShell script in the background.
  */
 function showNotification(title, message) {
@@ -11,27 +28,27 @@ function showNotification(title, message) {
     return;
   }
 
-  // Escape backticks and double quotes in PowerShell
-  const escapedTitle = title.replace(/`/g, '``').replace(/"/g, '`"');
-  const escapedMessage = message.replace(/`/g, '``').replace(/"/g, '`"');
+  // Construct XML template safely in JS
+  const xmlPayload = `
+<toast>
+    <visual>
+        <binding template="ToastGeneric">
+            <text id="1">${escapeXml(title)}</text>
+            <text id="2">${escapeXml(message)}</text>
+        </binding>
+    </visual>
+</toast>
+`.trim();
+
+  // Escape single quotes for PowerShell single-quoted literal string
+  const escapedXmlPayload = xmlPayload.replace(/'/g, "''");
 
   const psScript = `
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
 
-$ToastTemplate = @"
-<toast>
-    <visual>
-        <binding template="ToastGeneric">
-            <text id="1">${escapedTitle}</text>
-            <text id="2">${escapedMessage}</text>
-        </binding>
-    </visual>
-</toast>
-"@
-
 $ToastXml = [Windows.Data.Xml.Dom.XmlDocument]::New()
-$ToastXml.LoadXml($ToastTemplate)
+$ToastXml.LoadXml('${escapedXmlPayload}')
 $ToastMessage = [Windows.UI.Notifications.ToastNotification]::New($ToastXml)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("PowerShell").Show($ToastMessage)
 `;
