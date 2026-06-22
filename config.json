@@ -2,7 +2,7 @@
   "debounceDelayMs": 10000,
   "monitoredRoots": [
     "L:\\git_auto_sync_service",
-    "G:\\QTDN"
+    "G:\\ERP_Local_Mini"
   ],
   "ignoredPatterns": [
     ".git",
