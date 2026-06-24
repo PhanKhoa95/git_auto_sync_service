@@ -6,7 +6,7 @@ const CONFIG_FILE = path.join(__dirname, '..', 'config.json');
 
 const DEFAULT_CONFIG = {
   debounceDelayMs: 10000,
-  monitoredRoots: ['E:\\'],
+  monitoredRoots: [path.parse(__dirname).root],
   ignoredPatterns: ['.git', '.agents', 'sync.log', 'node_modules'],
   maxScanDepth: 3,
   remotePullIntervalMs: 300000 // default 5 minutes

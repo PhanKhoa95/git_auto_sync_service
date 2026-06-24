@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Allow configuration via environment variables for testing purposes
-const LOG_FILE = process.env.TEST_LOG_FILE || process.env.SYNC_LOG_PATH || 'E:\\git_auto_sync_service\\sync.log';
+const LOG_FILE = process.env.TEST_LOG_FILE || process.env.SYNC_LOG_PATH || path.join(__dirname, '..', 'sync.log');
 
 function formatMessage(level, message) {
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);

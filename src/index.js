@@ -7,8 +7,8 @@ const { watchRepositories, stopWatching } = require('./repo-watcher');
 const { registerChildProcess, killAllChildProcesses } = require('./child-process-registry');
 
 
-// Base directory configurable via env, defaulting to 'E:\'
-const BASE_DIR = process.env.TEST_E_DRIVE_PATH || 'E:\\';
+// Base directory configurable via env, defaulting to the current drive root
+const BASE_DIR = process.env.TEST_E_DRIVE_PATH || path.parse(__dirname).root;
 const lockFilePath = path.join(BASE_DIR, '.sync.lock');
 
 /**
