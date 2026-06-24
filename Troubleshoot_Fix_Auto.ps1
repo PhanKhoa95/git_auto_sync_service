@@ -208,9 +208,9 @@ while ($choice -ne "9") {
         }
         "8" {
             Write-Host "`n=== [8] XEM NHAT KY HOAT DONG ===" -ForegroundColor Yellow
-            $logPath = "E:\git_auto_sync_service\sync.log"
+            $logPath = Join-Path $PSScriptRoot "sync.log"
             if (-not (Test-Path $logPath)) {
-                $logPath = Join-Path $PSScriptRoot "sync.log"
+                $logPath = "E:\git_auto_sync_service\sync.log"
             }
             if (Test-Path $logPath) {
                 Write-Host "15 dong nhat ky hoat dong gan nhat tu ${logPath}:`n"

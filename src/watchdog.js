@@ -3,11 +3,11 @@ const path = require('path');
 const fs = require('fs');
 
 const indexJsPath = path.join(__dirname, 'index.js');
-const BASE_DIR = process.env.TEST_E_DRIVE_PATH || 'E:\\';
+const BASE_DIR = process.env.TEST_E_DRIVE_PATH || path.parse(__dirname).root;
 const lockFilePath = path.join(BASE_DIR, '.sync.lock');
 
 // Resolve log file path uniform with repo-watcher.js
-const logFilePath = path.resolve(process.env.TEST_LOG_FILE || process.env.SYNC_LOG_PATH || 'E:\\git_auto_sync_service\\sync.log');
+const logFilePath = path.resolve(process.env.TEST_LOG_FILE || process.env.SYNC_LOG_PATH || path.join(__dirname, '..', 'sync.log'));
 
 function log(msg) {
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);

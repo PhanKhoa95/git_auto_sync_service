@@ -59,8 +59,8 @@ if (Test-Path $LauncherPath) {
     exit 1
 }
 
-# 5. Create initial sync.log if base directory is E:\ and sync.log is missing
-$LogPath = "E:\git_auto_sync_service\sync.log"
+# 5. Create initial sync.log if sync.log is missing
+$LogPath = Join-Path $InstallDir "sync.log"
 if (-not (Test-Path $LogPath)) {
     try {
         $parentDir = Split-Path $LogPath

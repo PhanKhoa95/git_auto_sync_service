@@ -3,7 +3,12 @@ Write-Host "     Git Auto-Sync Verification Script       "
 Write-Host "============================================="
 
 # Detect base path
-$BaseDir = "E:\"
+$BaseDir = Split-Path -Qualifier $PSScriptRoot
+if ($BaseDir -notlike "*:") {
+    $BaseDir = "E:\"
+} else {
+    $BaseDir = "$BaseDir\"
+}
 if ($env:TEST_E_DRIVE_PATH) {
     $BaseDir = $env:TEST_E_DRIVE_PATH
 }

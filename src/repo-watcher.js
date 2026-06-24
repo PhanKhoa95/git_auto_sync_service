@@ -45,7 +45,7 @@ function isIgnored(filename, repoPath) {
 
   // Ignore changes to the sync.log file itself
   const absolutePath = path.resolve(repoPath, filename);
-  const logFileAbsolute = path.resolve(process.env.TEST_LOG_FILE || process.env.SYNC_LOG_PATH || 'E:\\git_auto_sync_service\\sync.log');
+  const logFileAbsolute = path.resolve(process.env.TEST_LOG_FILE || process.env.SYNC_LOG_PATH || path.join(__dirname, '..', 'sync.log'));
   if (absolutePath === logFileAbsolute) {
     return true;
   }
@@ -166,7 +166,7 @@ async function findGitRepositoriesForRoot(baseDir) {
  */
 async function findGitRepositories() {
   const config = getConfig();
-  const roots = config.monitoredRoots || ['E:\\'];
+  const roots = config.monitoredRoots || [path.parse(__dirname).root];
   const allRepos = [];
 
   for (const root of roots) {
