@@ -15,7 +15,6 @@ End If
 
 ' Build command line
 cmd = nodePath & " """ & watchdogJsPath & """"
-
 ' Run the command windowless (0 = hide window, False = don't wait for execution to finish)
 WshShell.Run cmd, 0, False
 
