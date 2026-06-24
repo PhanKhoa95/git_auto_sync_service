@@ -271,4 +271,135 @@ describe('Tier 3 Integration & System Tests', function () {
     const content = fs.readFileSync(localFilePath, 'utf8');
     expect(content).to.equal('remote periodic content');
   });
+
+  // TC-T3-07: Visual conflict resolver API integration
+  it('TC-T3-07: Visual conflict resolver API integration', async () => {
+    const localPath = harness.createMockRepo('repo1', true);
+    const bareRepoPath = path.join(harness.remotesPath, 'repo1.git');
+
+    // 1. Create a file in local repo and push it to remote
+    const conflictFile = path.join(localPath, 'conflict.txt');
+    fs.writeFileSync(conflictFile, 'Line 1: Base\nLine 2: Base\nLine 3: Base\n', 'utf8');
+    harness.gitCmd(localPath, ['add', 'conflict.txt']);
+    harness.gitCmd(localPath, ['commit', '-m', 'Add base conflict file']);
+    harness.gitCmd(localPath, ['push', 'origin', 'master']);
+
+    // 2. Setup peer repository and pull
+    const peerRepoPath = path.join(harness.sandboxRoot, 'peer_repo');
+    harness.gitCmd(harness.sandboxRoot, ['clone', bareRepoPath, 'peer_repo']);
+    harness.gitCmd(peerRepoPath, ['config', 'user.name', 'PeerTester']);
+    harness.gitCmd(peerRepoPath, ['config', 'user.email', 'peer@tester.local']);
+
+    // 3. Make peer change and push
+    const peerConflictFile = path.join(peerRepoPath, 'conflict.txt');
+    fs.writeFileSync(peerConflictFile, 'Line 1: Base\nLine 2: Peer changes\nLine 3: Base\n', 'utf8');
+    harness.gitCmd(peerRepoPath, ['add', 'conflict.txt']);
+    harness.gitCmd(peerRepoPath, ['commit', '-m', 'Peer changes to line 2']);
+    harness.gitCmd(peerRepoPath, ['push', 'origin', 'master']);
+
+    // 4. Make local change and commit
+    fs.writeFileSync(conflictFile, 'Line 1: Base\nLine 2: Local changes\nLine 3: Base\n', 'utf8');
+    harness.gitCmd(localPath, ['add', 'conflict.txt']);
+    harness.gitCmd(localPath, ['commit', '-m', 'Local changes to line 2']);
+
+    // 5. Force merge conflict locally by pulling
+    try {
+      harness.gitCmd(localPath, ['pull', 'origin', 'master']);
+    } catch (e) {
+      // Pull will fail because of merge conflict
+    }
+
+    const mergeHeadPath = path.join(localPath, '.git', 'MERGE_HEAD');
+    expect(fs.existsSync(mergeHeadPath)).to.be.true;
+
+    // 6. Start the daemon with PORT 3095 and server enabled
+    harness.startDaemon({
+      START_SERVER: 'true',
+      PORT: '3095',
+      DEBOUNCE_DELAY: '1000'
+    });
+    await harness.waitForDaemonReady();
+
+    const port = 3095;
+
+    // Helper to make HTTP requests
+    const makeRequest = (method, reqPath, body = null) => {
+      const http = require('http');
+      return new Promise((resolve, reject) => {
+        const postData = body ? JSON.stringify(body) : '';
+        const options = {
+          hostname: '127.0.0.1',
+          port,
+          path: reqPath,
+          method,
+          headers: {}
+        };
+        if (body) {
+          options.headers['Content-Type'] = 'application/json';
+          options.headers['Content-Length'] = Buffer.byteLength(postData);
+        }
+        const req = http.request(options, (res) => {
+          let data = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              resolve({ status: res.statusCode, data: parsed });
+            } catch (e) {
+              resolve({ status: res.statusCode, raw: data });
+            }
+          });
+        });
+        req.on('error', reject);
+        if (body) req.write(postData);
+        req.end();
+      });
+    };
+
+    // 7. Verify /api/status shows conflict
+    const statusRes = await makeRequest('GET', '/api/status');
+    expect(statusRes.status).to.equal(200);
+    const repos = statusRes.data.watchedRepositories;
+    const repoInfo = repos[localPath];
+    expect(repoInfo).to.not.be.undefined;
+    expect(repoInfo.hasConflict).to.be.true;
+    expect(repoInfo.conflictedFiles).to.include('conflict.txt');
+
+    // 8. Verify /api/conflict-details returns raw content with conflict markers
+    const detailsRes = await makeRequest('GET', `/api/conflict-details?repoPath=${encodeURIComponent(localPath)}&file=conflict.txt`);
+    expect(detailsRes.status).to.equal(200);
+    expect(detailsRes.data.success).to.be.true;
+    expect(detailsRes.data.content).to.include('<<<<<<<');
+    expect(detailsRes.data.content).to.include('=======');
+    expect(detailsRes.data.content).to.include('>>>>>>>');
+
+    // 9. Resolve conflict via POST /api/resolve-file-conflict (action: 'ours')
+    const resolveRes = await makeRequest('POST', '/api/resolve-file-conflict', {
+      repoPath: localPath,
+      file: 'conflict.txt',
+      action: 'ours'
+    });
+    expect(resolveRes.status).to.equal(200);
+    expect(resolveRes.data.success).to.be.true;
+
+    // Verify status updated and conflictedFiles list is empty
+    const statusRes2 = await makeRequest('GET', '/api/status');
+    expect(statusRes2.data.watchedRepositories[localPath].conflictedFiles).to.have.lengthOf(0);
+
+    // 10. Complete merge via POST /api/complete-merge
+    const completeRes = await makeRequest('POST', '/api/complete-merge', {
+      repoPath: localPath
+    });
+    expect(completeRes.status).to.equal(200);
+    expect(completeRes.data.success).to.be.true;
+
+    // Verify MERGE_HEAD is gone
+    expect(fs.existsSync(mergeHeadPath)).to.be.false;
+
+    // Verify remote has the changes pushed
+    const remoteFiles = harness.gitCmd(bareRepoPath, ['ls-tree', '-r', 'master', '--name-only']).stdout;
+    expect(remoteFiles).to.include('conflict.txt');
+  });
 });
+

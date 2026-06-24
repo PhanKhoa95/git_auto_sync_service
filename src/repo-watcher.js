@@ -385,10 +385,22 @@ function getWatchedRepositoriesMetadata() {
   const metadata = {};
   const { getRemoteOriginUrl, getLastSyncTime, getLastSyncError } = require('./git-sync');
   for (const repoPath of watchers.keys()) {
+    const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+    const hasConflict = fs.existsSync(mergeHeadPath);
+    let conflictedFiles = [];
+    if (hasConflict) {
+      try {
+        const { execSync } = require('child_process');
+        const output = execSync('git diff --name-only --diff-filter=U', { cwd: repoPath, stdio: 'pipe' }).toString();
+        conflictedFiles = output.trim().split(/\r?\n/).filter(Boolean);
+      } catch (e) {}
+    }
     metadata[repoPath] = {
       remoteOrigin: getRemoteOriginUrl(repoPath),
       lastSyncTime: getLastSyncTime(repoPath),
-      lastSyncError: getLastSyncError(repoPath)
+      lastSyncError: getLastSyncError(repoPath),
+      hasConflict,
+      conflictedFiles
     };
   }
   return {

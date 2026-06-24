@@ -487,6 +487,108 @@ function startServer(port) {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('');
       }
+    } else if (req.method === 'GET' && reqPath === '/api/conflict-details') {
+      try {
+        const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const repoPath = urlParams.searchParams.get('repoPath');
+        const file = urlParams.searchParams.get('file');
+
+        if (!repoPath || !file) {
+          throw new Error('Missing repoPath or file parameter.');
+        }
+
+        const resolvedRepo = path.resolve(repoPath);
+        const resolvedFile = path.resolve(repoPath, file);
+        if (!resolvedFile.startsWith(resolvedRepo)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: 'Forbidden: Path traversal detected.' }));
+          return;
+        }
+
+        if (!fs.existsSync(resolvedFile)) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: 'File not found.' }));
+          return;
+        }
+
+        const content = fs.readFileSync(resolvedFile, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, content }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, message: e.message }));
+      }
+    } else if (req.method === 'POST' && reqPath === '/api/resolve-file-conflict') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const { repoPath, file, action, manualContent } = parsed;
+          if (!repoPath || !file || !action) {
+            throw new Error('Missing repoPath, file or action parameter.');
+          }
+
+          const resolvedRepo = path.resolve(repoPath);
+          const resolvedFile = path.resolve(repoPath, file);
+          if (!resolvedFile.startsWith(resolvedRepo)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, message: 'Forbidden: Path traversal detected.' }));
+            return;
+          }
+
+          const { execSync } = require('child_process');
+          if (action === 'ours') {
+            execSync(`git checkout --ours -- "${file}"`, { cwd: repoPath, stdio: 'pipe' });
+            execSync(`git add -- "${file}"`, { cwd: repoPath, stdio: 'pipe' });
+          } else if (action === 'theirs') {
+            execSync(`git checkout --theirs -- "${file}"`, { cwd: repoPath, stdio: 'pipe' });
+            execSync(`git add -- "${file}"`, { cwd: repoPath, stdio: 'pipe' });
+          } else if (action === 'manual') {
+            if (manualContent === undefined) {
+              throw new Error('Missing manualContent parameter for manual action.');
+            }
+            fs.writeFileSync(resolvedFile, manualContent, 'utf8');
+            execSync(`git add -- "${file}"`, { cwd: repoPath, stdio: 'pipe' });
+          } else {
+            throw new Error(`Invalid action: ${action}`);
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
+    } else if (req.method === 'POST' && reqPath === '/api/complete-merge') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body);
+          const { repoPath } = parsed;
+          if (!repoPath) throw new Error('Missing repoPath.');
+
+          const { execSync } = require('child_process');
+          execSync('git commit -m "Auto-merge: resolved conflicts via Web Dashboard"', { cwd: repoPath, stdio: 'pipe' });
+
+          const { getBranchName } = require('./git-sync');
+          const branch = getBranchName(repoPath);
+          if (branch) {
+            execSync(`git push origin "${branch}"`, { cwd: repoPath, stdio: 'pipe' });
+          }
+          
+          const { forceGlobalScan } = require('./repo-watcher');
+          forceGlobalScan();
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: e.message }));
+        }
+      });
     } else if (req.method === 'POST' && reqPath === '/api/open-folder') {
       let body = '';
       req.on('data', chunk => { body += chunk; });

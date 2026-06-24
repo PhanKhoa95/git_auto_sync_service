@@ -276,6 +276,13 @@ async function performSync(repoPath) {
   // Clear any stale git lock files left by crashed processes
   clearStaleGitLocks(repoPath);
 
+  // If there is an active conflict (MERGE_HEAD exists), skip the sync cycle to avoid conflict compounding
+  const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+  if (require('fs').existsSync(mergeHeadPath)) {
+    logger.warn(`[${repoName}] Active merge conflict detected. Skipping synchronization cycle.`);
+    return;
+  }
+
   try {
     // Exclude any symbolic links or directory junctions to avoid circular recursion loops
     excludeSymlinks(repoPath);
@@ -326,17 +333,35 @@ async function performSync(repoPath) {
           try {
             await runGit(repoPath, ['pull', 'origin', branch, '--allow-unrelated-histories']);
             logger.info(`[${repoName}] Pull with unrelated histories successful.`);
+            const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+            if (require('fs').existsSync(mergeHeadPath)) {
+              logger.warn(`[${repoName}] Merge conflict detected during pull retry. Leaving merge state active for user resolution.`);
+            } else {
+              await abortMergeIfNeeded(repoPath, repoName);
+            }
+            lastSyncErrors.delete(repoPath);
+            return;
           } catch (retryErr) {
-            const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
-            logger.error(`[${repoName}] Pull with unrelated histories failed: ${getErrorMessage(retryErr)}. Output: ${retryErr.stderr ? retryErr.stderr.trim() : ''}`);
-            await abortMergeIfNeeded(repoPath, repoName);
-            reportGitError(repoPath, repoName, 'cập nhật (pull)', errDetails);
+            const retryErrDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
+            logger.error(`[${repoName}] Pull with unrelated histories failed: ${getErrorMessage(retryErr)}`);
+            const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+            if (require('fs').existsSync(mergeHeadPath)) {
+              logger.warn(`[${repoName}] Merge conflict detected during pull retry. Leaving merge state active for user resolution.`);
+            } else {
+              await abortMergeIfNeeded(repoPath, repoName);
+            }
+            reportGitError(repoPath, repoName, 'cập nhật (pull)', retryErrDetails);
             return;
           }
         } else {
           const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
           logger.error(`[${repoName}] Pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
-          await abortMergeIfNeeded(repoPath, repoName);
+          const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+          if (require('fs').existsSync(mergeHeadPath)) {
+            logger.warn(`[${repoName}] Merge conflict detected during pull. Leaving merge state active for user resolution.`);
+          } else {
+            await abortMergeIfNeeded(repoPath, repoName);
+          }
           reportGitError(repoPath, repoName, 'cập nhật (pull)', errDetails);
           logger.warn(`[${repoName}] Skipping remainder of synchronization cycle to prevent conflict compounding.`);
           return;
@@ -491,6 +516,11 @@ async function pullOnly(repoPath) {
       clearStaleGitLocks(repoPath);
       excludeSymlinks(repoPath);
 
+      const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+      if (fs.existsSync(mergeHeadPath)) {
+        return; // skip periodic pull if conflict is active
+      }
+
       let branch = getBranchName(repoPath);
       if (!branch) {
         try {
@@ -565,13 +595,23 @@ async function pullOnly(repoPath) {
             } catch (retryErr) {
               const errDetails = retryErr.stderr ? retryErr.stderr.trim() : getErrorMessage(retryErr);
               logger.error(`[${repoName}] Periodic pull with unrelated histories failed: ${getErrorMessage(retryErr)}`);
-              await abortMergeIfNeeded(repoPath, repoName);
+              const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+              if (fs.existsSync(mergeHeadPath)) {
+                logger.warn(`[${repoName}] Merge conflict detected during periodic pull retry. Leaving merge state active for user resolution.`);
+              } else {
+                await abortMergeIfNeeded(repoPath, repoName);
+              }
               reportGitError(repoPath, repoName, 'cập nhật tự động (pull)', errDetails);
             }
           } else {
             const errDetails = err.stderr ? err.stderr.trim() : getErrorMessage(err);
             logger.error(`[${repoName}] Periodic pull failed: ${getErrorMessage(err)}. Output: ${err.stderr ? err.stderr.trim() : ''}`);
-            await abortMergeIfNeeded(repoPath, repoName);
+            const mergeHeadPath = path.join(repoPath, '.git', 'MERGE_HEAD');
+            if (fs.existsSync(mergeHeadPath)) {
+              logger.warn(`[${repoName}] Merge conflict detected during periodic pull. Leaving merge state active for user resolution.`);
+            } else {
+              await abortMergeIfNeeded(repoPath, repoName);
+            }
             reportGitError(repoPath, repoName, 'cập nhật tự động (pull)', errDetails);
           }
         }
