@@ -3,8 +3,7 @@
   "monitoredRoots": [
     "Y:\\git_auto_sync_service",
     "Y:\\Trinh_Quan_Ly_Zalo_Ca_Nhan",
-    "Y:\\ERP_Local_Mini",
-    "C:\\Users\\KHOA MEDIA\\OneDrive\\Documents\\agent-gig-dashboard"
+    "Y:\\ERP_Local_Mini"
   ],
   "ignoredPatterns": [
     ".git",
