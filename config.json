@@ -3,7 +3,8 @@
   "monitoredRoots": [
     "Y:\\git_auto_sync_service",
     "Y:\\Trinh_Quan_Ly_Zalo_Ca_Nhan",
-    "Y:\\ERP_Local_Mini"
+    "Y:\\ERP_Local_Mini",
+    "Y:\\AntiQuotar"
   ],
   "ignoredPatterns": [
     ".git",
